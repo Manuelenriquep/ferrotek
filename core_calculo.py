@@ -101,7 +101,6 @@ def generar_presupuesto(tipo, dimension):
     precio_mo = PRECIOS['mo_estanque'] if tipo == "estanque" else PRECIOS['mo_casa']
     espesor_muro = 3.5
     
-    # Variables de salida extra
     volumen_litros = 0
     altura_util = 0
 
@@ -123,18 +122,17 @@ def generar_presupuesto(tipo, dimension):
 
     elif tipo == "estanque":
         espesor_muro = 2.5
-        altura_util = 1.20 # Altura Estandarizada
+        altura_util = 1.20 
         radio = dimension / 2
         
-        # CÁLCULO VOLUMEN (V = pi * r^2 * h)
+        # CÁLCULO VOLUMEN
         volumen_m3 = math.pi * (radio**2) * altura_util
         volumen_litros = volumen_m3 * 1000
         
         area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * altura_util)
         
-        # NUEVO NOMBRE CON CAPACIDAD
-        nombre = f"Estanque {dimension}m ({int(volumen_litros):,} Litros)"
-        descripcion = f"Altura: {altura_util}m | Vol: {volumen_m3:.1f} m³"
+        nombre = f"Estanque D={dimension}m ({int(volumen_litros):,} Litros)"
+        descripcion = f"Comparativa vs Plástico | Vol: {volumen_m3:.1f} m³"
         
         area_piso = math.pi * (radio**2)
         largo = 0
@@ -149,7 +147,7 @@ def generar_presupuesto(tipo, dimension):
         area_total_fc = area_techo_muros + area_tapas
         area_piso = ancho_bov * dimension
         largo = dimension
-        altura_util = 2.80 # Altura cumbrera
+        altura_util = 2.80 
         
         if dimension == 3:
             nombre, descripcion = "Bóveda 3m (Bodega)", "Murete 90cm | Sin Baño"
@@ -189,8 +187,8 @@ def generar_presupuesto(tipo, dimension):
         'nombre': nombre,
         'descripcion': descripcion,
         'area': round(area_piso if tipo == "vivienda" else area_total_fc, 1),
-        'volumen_litros': int(volumen_litros), # Nueva Variable
-        'altura': altura_util, # Nueva Variable
+        'volumen_litros': int(volumen_litros),
+        'altura': altura_util,
         'costo_directo': int(costo_directo),
         'precio_venta': int(precio_venta),
         'lista_compras': {

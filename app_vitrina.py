@@ -68,10 +68,10 @@ if datos:
             st.markdown('<p class="check-header">🧱 Obra Negra (Ferretería)</p>', unsafe_allow_html=True)
             st.checkbox(f"{lc['cemento']} Bultos Cemento (50kg)", value=True)
             
-            # Ahora la Cal aparece siempre si es > 0
+            # CAL SIEMPRE PRESENTE
             if lc['cal'] > 0:
                 st.checkbox(f"{lc['cal']} Bultos Cal Hidratada (10kg)", value=True)
-            
+                
             st.checkbox(f"{lc['arena']} m³ Arena de Río", value=True)
             if lc['triturado'] > 0:
                 st.checkbox(f"{lc['triturado']} m³ Triturado (Piso)", value=True)

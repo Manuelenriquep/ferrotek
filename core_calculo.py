@@ -18,12 +18,14 @@ PRECIOS = {
 def calcular_mezcla(area_m2, espesor_cm, tipo):
     volumen_m3 = area_m2 * (espesor_cm / 100)
     
-    # RENDIMIENTOS ESTÁNDAR (Con Cal para todo)
+    # RENDIMIENTOS ESTÁNDAR (La Cal es vital en ambos casos)
+    # Casa: 1:3:3 (Cemento:Arena:Cal) -> Más Cal para manejabilidad en muros altos
+    # Estanque: Mezcla más rica en cemento, pero CON CAL para impermeabilidad
+    
     cemento = volumen_m3 * 8     # Bultos 50kg
     arena = volumen_m3 * 1.1     # m3
-    cal = volumen_m3 * 25        # Bultos 10kg (Cal Hidrofóbica/Hidratada)
+    cal = volumen_m3 * 25        # Bultos 10kg (Relleno de poros y plasticidad)
     
-    # Ya no usamos aditivo químico costoso, confiamos en la Cal
     costo = (cemento * PRECIOS['cemento']) + \
             (cal * PRECIOS['cal']) + \
             (arena * PRECIOS['arena'])
@@ -119,7 +121,7 @@ def generar_presupuesto(tipo, dimension):
         if dimension == 1: largo, area_piso, pts_elec, kits_bano = 7.00, 35.0, 18, 1
         elif dimension == 2: largo, area_piso, pts_elec, kits_bano = 13.00, 65.0, 30, 1.5
         elif dimension == 3: largo, area_piso, pts_elec, kits_bano = 22.00, 110.0, 50, 2
-        nombre, descripcion = f"Modelo {dimension}", "Mortero Reforzado | Llave en Mano"
+        nombre, descripcion = f"Modelo {dimension}", "Llave en Mano"
         costo_hidro = PRECIOS['kit_cocina'] + (PRECIOS['kit_bano'] * kits_bano)
         costo_elec = pts_elec * PRECIOS['punto_elec']
         carp = calcular_carpinteria(dimension)
@@ -140,7 +142,7 @@ def generar_presupuesto(tipo, dimension):
         area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * altura_util)
         
         nombre = f"Estanque D={dimension}m ({int(volumen_litros):,} Litros)"
-        descripcion = f"Mortero con Cal Hidrófuga | Vol: {volumen_m3:.1f} m³"
+        descripcion = f"Mezcla con Cal Hidrófuga | Vol: {volumen_m3:.1f} m³"
         area_piso = math.pi * (radio**2)
         largo = 0
 
@@ -157,16 +159,16 @@ def generar_presupuesto(tipo, dimension):
         altura_util = 2.80 
         
         if dimension == 3:
-            nombre, descripcion = "Bóveda 3m (Bodega)", "Mortero Reforzado | Sin Baño"
+            nombre, descripcion = "Bóveda 3m (Bodega)", "Murete 90cm | Sin Baño"
             costo_elec, costo_carp = 3 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['ventana']
             lista_compras['elec'], lista_compras['carp'] = 3, {'p_ext': 1, 'p_int': 0, 'vent': 1}
         else:
-            nombre, descripcion = "Bóveda 6m (Suite)", "Mortero Reforzado | Con Baño"
+            nombre, descripcion = "Bóveda 6m (Suite)", "Murete 90cm | Con Baño"
             costo_elec, costo_carp = 8 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['puerta_int'] + (PRECIOS['ventana']*2)
             costo_hidro = PRECIOS['kit_bano']
             lista_compras['elec'], lista_compras['carp'], lista_compras['hidro'] = 8, {'p_ext': 1, 'p_int': 1, 'vent': 2}, {'baños': 1}
 
-    # PASAR 'TIPO' PARA MEZCLA
+    # SIN ADITIVO, SOLO CAL
     mezcla = calcular_mezcla(area_total_fc, espesor_muro, tipo)
     
     dim_est = dimension if tipo == "estanque" else 0
@@ -184,7 +186,6 @@ def generar_presupuesto(tipo, dimension):
         acabado = area_real_piso * PRECIOS['microcemento']
         costo_piso_concreto = base + acabado
 
-    # MANO DE OBRA GLOBAL PARA ESTANQUES PEQUEÑOS
     if tipo == "estanque" and dimension <= 1.5:
         costo_mano_obra = 250000 
     else:
@@ -193,7 +194,6 @@ def generar_presupuesto(tipo, dimension):
     costo_directo = mezcla['costo'] + estructura['costo'] + costo_mano_obra + \
                     costo_piso_concreto + costo_hidro + costo_elec + costo_carp
     
-    # MARGEN AGRESIVO PARA PRODUCTO GANCHO
     margen = 1.30
     if tipo == "estanque" and dimension <= 1.5:
         margen = 1.25

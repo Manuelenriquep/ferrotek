@@ -29,6 +29,7 @@ elif categoria == "🐟 Estanques":
     dim = st.sidebar.select_slider("Diámetro:", [2, 4, 8, 10, 12], value=4)
     datos = core.generar_presupuesto("estanque", dim)
 elif categoria == "⛺ Bóvedas":
+    st.sidebar.info("Sistema Telescópico:\nMurete Tubo 90cm + Arco Varilla")
     largo = st.sidebar.radio("Fondo:", [3, 6], format_func=lambda x: f"{x} Metros")
     datos = core.generar_presupuesto("boveda", largo)
 
@@ -36,7 +37,7 @@ if datos:
     st.markdown(f"### {datos['nombre']}")
     st.caption(datos['descripcion'])
     
-    # TABS (PESTAÑAS)
+    # TABS
     tab1, tab2 = st.tabs(["🛒 Lista de Compras", "💰 Resumen Financiero"])
     
     with tab1:
@@ -47,7 +48,6 @@ if datos:
         with col_a:
             st.markdown('<div class="check-list">', unsafe_allow_html=True)
             st.markdown('<p class="check-header">🧱 Obra Negra (Ferretería)</p>', unsafe_allow_html=True)
-            # AQUÍ ESTÁ LA CORRECCIÓN VISUAL:
             st.checkbox(f"{lc['cemento']} Bultos Cemento (50kg)", value=True)
             st.checkbox(f"{lc['cal']} Bultos Cal Hidratada (10kg)", value=True) 
             st.checkbox(f"{lc['arena']} m³ Arena de Río", value=True)
@@ -58,15 +58,15 @@ if datos:
             st.markdown('<div class="check-list">', unsafe_allow_html=True)
             st.markdown('<p class="check-header">🦴 Acero y Estructura</p>', unsafe_allow_html=True)
             if lc['tubos'] > 0:
-                st.checkbox(f"{lc['tubos']} Tubos Estructurales 50x50 (6m)", value=True)
+                st.checkbox(f"{lc['tubos']} Tubos 50x50 (Muros/Vigas)", value=True)
             if lc['varillas'] > 0:
-                st.checkbox(f"{lc['varillas']} Varillas Corrugadas (6m)", value=True)
+                st.checkbox(f"{lc['varillas']} Varillas Corrugadas (Arcos)", value=True)
             st.checkbox(f"{lc['malla']} Paneles Malla Electrosoldada", value=True)
             st.checkbox(f"{lc['zaranda']} Rollos Malla Gallinero (30m)", value=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col_b:
-            if lc['techo']:
+            if lc.get('techo'): # Solo casas tienen techo Nelta aparte
                 st.markdown('<div class="check-list">', unsafe_allow_html=True)
                 st.markdown('<p class="check-header">☂️ Cubierta Nelta</p>', unsafe_allow_html=True)
                 st.checkbox(f"{lc['techo']['tejas']} Tejas Termoacústicas (5.70m)", value=True)
@@ -82,7 +82,7 @@ if datos:
                 carp = lc.get('carpinteria', {})
                 if carp.get('p_ext'): st.checkbox(f"{carp['p_ext']} Puertas ppal. Seguridad", value=True)
                 if carp.get('p_int'): st.checkbox(f"{carp['p_int']} Puertas Interior Entamboradas", value=True)
-                if carp.get('vent'): st.checkbox(f"{carp['vent']} Ventanas Aluminio 1x1", value=True)
+                if carp.get('vent'): st.checkbox(f"{carp['vent']} Ventanas Aluminio", value=True)
                 
                 # Hidro
                 hidro = lc.get('hidro', {})

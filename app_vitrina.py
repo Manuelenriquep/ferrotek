@@ -36,7 +36,7 @@ if datos:
     st.markdown(f"### {datos['nombre']}")
     st.caption(datos['descripcion'])
     
-    # TABS
+    # TABS (PESTAÑAS)
     tab1, tab2 = st.tabs(["🛒 Lista de Compras", "💰 Resumen Financiero"])
     
     with tab1:
@@ -47,8 +47,9 @@ if datos:
         with col_a:
             st.markdown('<div class="check-list">', unsafe_allow_html=True)
             st.markdown('<p class="check-header">🧱 Obra Negra (Ferretería)</p>', unsafe_allow_html=True)
+            # AQUÍ ESTÁ LA CORRECCIÓN VISUAL:
             st.checkbox(f"{lc['cemento']} Bultos Cemento (50kg)", value=True)
-            st.checkbox(f"{lc['cal']} Bultos Cal Vivacal (25kg)", value=True)
+            st.checkbox(f"{lc['cal']} Bultos Cal Hidratada (10kg)", value=True) 
             st.checkbox(f"{lc['arena']} m³ Arena de Río", value=True)
             if lc['triturado'] > 0:
                 st.checkbox(f"{lc['triturado']} m³ Triturado (Piso)", value=True)
@@ -92,8 +93,6 @@ if datos:
                 if lc['elec']: st.checkbox(f"{lc['elec']} Puntos Eléctricos (Material)", value=True)
                 if lc['area_piso']: st.checkbox(f"{lc['area_piso']} m² Microcemento (Acabado)", value=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-
-        st.warning("⚠️ Nota: Las cantidades incluyen desperdicio técnico estimado. Verificar medidas en obra antes de comprar.")
 
     with tab2:
         st.metric("Precio Sugerido Venta", f"${datos['precio_venta']:,.0f}")

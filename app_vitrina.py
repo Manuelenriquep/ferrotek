@@ -1,120 +1,88 @@
 import streamlit as st
-from core_calculo import SistemaFerrotek
+import core_calculo as core
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(
-    page_title="Ferrotek | Ingeniería Rural", 
-    page_icon="🛡️", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Ferrotek | Ingeniería Rural", page_icon="🏗️", layout="centered")
 
-# --- ESTILOS VISUALES FERROTEK ---
+# CSS Estilos
 st.markdown("""
-<style>
-    .block-container {padding-top: 2rem;}
-    h1 {color: #2C3E50;}
-    h2 {color: #D35400; font-size: 24px;} /* Naranja Ladrillo */
-    .price-tag {
-        font-size: 36px; 
-        font-weight: bold; 
-        color: #27AE60;
-        background-color: #EAFAF1;
-        padding: 10px;
-        border-radius: 10px;
-        text-align: center;
-        border: 2px solid #27AE60;
-    }
-    .metric-card {
-        background-color: #F4F6F7;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #2C3E50; /* Gris Acero */
-    }
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    .big-font { font-size:26px !important; color: #154360; font-weight: bold; }
+    .price-tag { font-size:38px; color: #27AE60; font-weight: bold; }
+    .card { background-color: #f4f6f7; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #2980B9;}
+    .unit-tag { color: #555; font-size: 14px; font-style: italic; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- CABECERA ---
-col_logo, col_title = st.columns([1, 6])
-with col_logo:
-    st.write("## 🛡️") 
-with col_title:
-    st.title("FERROTEK")
-    st.write("**Ingeniería de Precisión para el Campo**")
+st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Bucaramanga", use_container_width=True)
+st.markdown("### 🏗️ Vitrina Digital de Costos")
+
+# --- MENÚ LATERAL ---
+st.sidebar.header("🛠️ Configuración")
+categoria = st.sidebar.radio("Categoría:", 
+    ["🏠 Casas Modulares", "🐟 Estanques", "⛺ Bóvedas"])
+
+datos = None
+
+if categoria == "🏠 Casas Modulares":
+    st.sidebar.markdown("---")
+    st.sidebar.info("📍 **Estándar Santander:**\nTeja Termoacústica 5.70m\nAncho Casa: 5.00m")
+    modelo = st.sidebar.selectbox("Selecciona Modelo:", [1, 2, 3], 
+        format_func=lambda x: f"Modelo {x} ({['Suite', 'Cotidiana', 'Patriarca'][x-1]})")
+    datos = core.generar_presupuesto("vivienda", modelo)
+
+elif categoria == "🐟 Estanques":
+    st.sidebar.markdown("---")
+    dim = st.sidebar.select_slider("Diámetro (m):", [2, 4, 8, 10, 12], value=4)
+    datos = core.generar_presupuesto("estanque", dim)
+
+elif categoria == "⛺ Bóvedas":
+    st.sidebar.markdown("---")
+    largo = st.sidebar.radio("Fondo:", [3, 6], format_func=lambda x: f"{x} Metros")
+    datos = core.generar_presupuesto("boveda", largo)
+
+# --- RESULTADOS ---
+if datos:
+    st.markdown("---")
+    st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
+    st.caption(f"📌 {datos['descripcion']}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"""
+        <div class="card">
+            <h4>💰 Precio Sugerido</h4>
+            <p class="price-tag">${datos['precio_venta']:,.0f}</p>
+            <small>Costo Directo: ${datos['costo_directo']:,.0f}</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+        <div class="card">
+            <h4>📋 Especificaciones</h4>
+            <p><b>Área:</b> {datos['area']} m²</p>
+            <p><b>Techo:</b> Termoacústica (Garantía 10 años)</p>
+            <p><b>Mezcla:</b> 1:3:3 Impermeable</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- SECCIÓN MEJORADA CON UNIDADES ---
+    with st.expander("🧱 Ver Lista de Materiales (Detallada)", expanded=True):
+        m = datos['materiales']
+        
+        st.markdown("##### 🦴 Acero & Estructura")
+        st.write(f"• **{m['estructura']}**")
+        st.write(f"• **{m['malla']}** Paneles <span class='unit-tag'>(Malla Electrosoldada 6m x 2.35m)</span>", unsafe_allow_html=True)
+        st.write(f"• **{m['zaranda']}** Rollos <span class='unit-tag'>(Malla Gallinero 30m x 0.90m)</span>", unsafe_allow_html=True)
+        
+        st.markdown("##### 🧪 Agregados (Mezcla 1:3:3)")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Cemento", f"{m['cemento']}", "Bultos 50kg")
+        with c2:
+            st.metric("Cal", f"{m['cal']}", "Bultos 25kg")
+        with c3:
+            st.metric("Arena", f"{m['arena']}", "m³ (Lavada)")
 
 st.markdown("---")
-
-# Inicializar Cerebro
-sistema = SistemaFerrotek()
-
-# --- BARRA LATERAL (CONTROLES) ---
-with st.sidebar:
-    st.header("🔧 Configuración")
-    st.info("Catálogo Digital v1.0")
-    
-    opcion = st.radio(
-        "Seleccione Modelo:",
-        ("1_alcoba", "2_alcobas", "3_alcobas"),
-        format_func=lambda x: x.replace("_", " ").title()
-    )
-    
-    st.markdown("---")
-    st.write("📍 **Ferrotek Ingeniería**")
-    st.caption("División de Guanes.biz")
-    st.caption("Santander, Colombia")
-
-# --- LÓGICA DE CÁLCULO ---
-datos = sistema.calcular_modelo(opcion)
-
-if datos:
-    # --- COLUMNA IZQUIERDA: IMAGEN DEL MODELO ---
-    col_img, col_info = st.columns([1, 1])
-    
-    with col_img:
-        st.subheader(f"🏠 {datos['Modelo']}")
-        
-        # Imágenes de referencia (Temporales)
-        if opcion == "1_alcoba":
-            st.image("https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&q=80&w=800", caption="Ref: Suite Rural Compacta")
-        elif opcion == "2_alcobas":
-            st.image("https://images.unsplash.com/photo-1513584685908-2274653fa36f?auto=format&fit=crop&q=80&w=800", caption="Ref: Casa Tradicional")
-        else:
-            st.image("https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800", caption="Ref: Casa Familiar Grande")
-
-        st.info("💡 **Sistema:** Estructura Tubular 50x50 + Doble Membrana + Mezcla Antihongos")
-
-    # --- COLUMNA DERECHA: PRECIOS Y RESUMEN ---
-    with col_info:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("### 💰 Presupuesto Estimado")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.caption("Costo Directo (Materiales + MO)")
-            st.markdown(f"**${datos['costo_total']:,.0f}**")
-        with c2:
-            st.caption("Precio Sugerido Venta")
-            st.markdown(f'<div class="price-tag">${datos["precio_venta"]:,.0f}</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown("### 📋 Ficha Técnica")
-        st.write(f"**Área Construida:** {datos['Area']}")
-        st.write(f"**Distribución:** {datos['Configuracion']}")
-        
-        with st.expander("Ver Desglose de Materiales"):
-            st.markdown("**🦴 Estructura Metálica:**")
-            st.write(f"- {datos['Resumen_Estructura']['Tubos_50x50']} Tubos Estructurales 50x50")
-            st.write(f"- {datos['Resumen_Estructura']['Tornillos_Estructurales_HEX']}")
-            
-            st.markdown("**🧥 Piel & Acabados:**")
-            st.write(f"- {datos['Resumen_Piel']['Malla_Electro']} Paneles Electrosoldados")
-            st.write(f"- {datos['Resumen_Piel']['Zaranda_Rollos']} Rollos Zaranda")
-            st.write(f"- {datos['Resumen_Piel']['Tornillos_Fijacion_LENTEJA']}")
-            
-            st.markdown("**🧪 Mezcla Impermeable (1:3:3):**")
-            st.write(f"- {datos['Resumen_Mezcla_Impermeable']['Cemento']} (Cemento)")
-            st.write(f"- {datos['Resumen_Mezcla_Impermeable']['Cal_Hidratada']} (Cal Antihongos)")
-            st.write(f"- {datos['Resumen_Mezcla_Impermeable']['Arena_Fina']} (Arena Fina)")
-
-    st.success("✅ Cotización Oficial Ferrotec.")
+st.caption("© 2026 Ferrotek | Precios actualizados Bucaramanga")

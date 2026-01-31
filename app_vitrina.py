@@ -1,88 +1,104 @@
 import streamlit as st
 import core_calculo as core
 
-st.set_page_config(page_title="Ferrotek | Ingeniería Rural", page_icon="🏗️", layout="centered")
+st.set_page_config(page_title="Ferrotek | Lista de Compras", page_icon="🛒", layout="centered")
 
 # CSS Estilos
 st.markdown("""
     <style>
     .big-font { font-size:26px !important; color: #154360; font-weight: bold; }
-    .price-tag { font-size:38px; color: #27AE60; font-weight: bold; }
-    .card { background-color: #f4f6f7; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #2980B9;}
-    .unit-tag { color: #555; font-size: 14px; font-style: italic; }
+    .price-tag { font-size:32px; color: #27AE60; font-weight: bold; }
+    .check-list { background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; }
+    .check-header { font-weight: bold; color: #E67E22; font-size: 18px; margin-bottom: 10px; border-bottom: 2px solid #E67E22;}
     </style>
     """, unsafe_allow_html=True)
 
-st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Bucaramanga", use_container_width=True)
-st.markdown("### 🏗️ Vitrina Digital de Costos")
+st.image("https://via.placeholder.com/800x150.png?text=FERROTEK+Listado+de+Materiales", use_container_width=True)
 
-# --- MENÚ LATERAL ---
-st.sidebar.header("🛠️ Configuración")
-categoria = st.sidebar.radio("Categoría:", 
-    ["🏠 Casas Modulares", "🐟 Estanques", "⛺ Bóvedas"])
+# --- CONFIGURACIÓN ---
+st.sidebar.header("🛠️ Configura tu Pedido")
+categoria = st.sidebar.radio("Categoría:", ["🏠 Casas Modulares", "🐟 Estanques", "⛺ Bóvedas"])
 
 datos = None
 
 if categoria == "🏠 Casas Modulares":
-    st.sidebar.markdown("---")
-    st.sidebar.info("📍 **Estándar Santander:**\nTeja Termoacústica 5.70m\nAncho Casa: 5.00m")
-    modelo = st.sidebar.selectbox("Selecciona Modelo:", [1, 2, 3], 
-        format_func=lambda x: f"Modelo {x} ({['Suite', 'Cotidiana', 'Patriarca'][x-1]})")
+    st.sidebar.info("Incluye Carpintería y Redes")
+    modelo = st.sidebar.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
     datos = core.generar_presupuesto("vivienda", modelo)
-
 elif categoria == "🐟 Estanques":
-    st.sidebar.markdown("---")
-    dim = st.sidebar.select_slider("Diámetro (m):", [2, 4, 8, 10, 12], value=4)
+    dim = st.sidebar.select_slider("Diámetro:", [2, 4, 8, 10, 12], value=4)
     datos = core.generar_presupuesto("estanque", dim)
-
 elif categoria == "⛺ Bóvedas":
-    st.sidebar.markdown("---")
     largo = st.sidebar.radio("Fondo:", [3, 6], format_func=lambda x: f"{x} Metros")
     datos = core.generar_presupuesto("boveda", largo)
 
-# --- RESULTADOS ---
 if datos:
-    st.markdown("---")
-    st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
-    st.caption(f"📌 {datos['descripcion']}")
+    st.markdown(f"### {datos['nombre']}")
+    st.caption(datos['descripcion'])
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="card">
-            <h4>💰 Precio Sugerido</h4>
-            <p class="price-tag">${datos['precio_venta']:,.0f}</p>
-            <small>Costo Directo: ${datos['costo_directo']:,.0f}</small>
-        </div>
-        """, unsafe_allow_html=True)
+    # TABS
+    tab1, tab2 = st.tabs(["🛒 Lista de Compras", "💰 Resumen Financiero"])
+    
+    with tab1:
+        lc = datos['lista_compras']
         
-    with col2:
-        st.markdown(f"""
-        <div class="card">
-            <h4>📋 Especificaciones</h4>
-            <p><b>Área:</b> {datos['area']} m²</p>
-            <p><b>Techo:</b> Termoacústica (Garantía 10 años)</p>
-            <p><b>Mezcla:</b> 1:3:3 Impermeable</p>
-        </div>
-        """, unsafe_allow_html=True)
+        col_a, col_b = st.columns(2)
+        
+        with col_a:
+            st.markdown('<div class="check-list">', unsafe_allow_html=True)
+            st.markdown('<p class="check-header">🧱 Obra Negra (Ferretería)</p>', unsafe_allow_html=True)
+            st.checkbox(f"{lc['cemento']} Bultos Cemento (50kg)", value=True)
+            st.checkbox(f"{lc['cal']} Bultos Cal Vivacal (25kg)", value=True)
+            st.checkbox(f"{lc['arena']} m³ Arena de Río", value=True)
+            if lc['triturado'] > 0:
+                st.checkbox(f"{lc['triturado']} m³ Triturado (Piso)", value=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="check-list">', unsafe_allow_html=True)
+            st.markdown('<p class="check-header">🦴 Acero y Estructura</p>', unsafe_allow_html=True)
+            if lc['tubos'] > 0:
+                st.checkbox(f"{lc['tubos']} Tubos Estructurales 50x50 (6m)", value=True)
+            if lc['varillas'] > 0:
+                st.checkbox(f"{lc['varillas']} Varillas Corrugadas (6m)", value=True)
+            st.checkbox(f"{lc['malla']} Paneles Malla Electrosoldada", value=True)
+            st.checkbox(f"{lc['zaranda']} Rollos Malla Gallinero (30m)", value=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- SECCIÓN MEJORADA CON UNIDADES ---
-    with st.expander("🧱 Ver Lista de Materiales (Detallada)", expanded=True):
-        m = datos['materiales']
-        
-        st.markdown("##### 🦴 Acero & Estructura")
-        st.write(f"• **{m['estructura']}**")
-        st.write(f"• **{m['malla']}** Paneles <span class='unit-tag'>(Malla Electrosoldada 6m x 2.35m)</span>", unsafe_allow_html=True)
-        st.write(f"• **{m['zaranda']}** Rollos <span class='unit-tag'>(Malla Gallinero 30m x 0.90m)</span>", unsafe_allow_html=True)
-        
-        st.markdown("##### 🧪 Agregados (Mezcla 1:3:3)")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Cemento", f"{m['cemento']}", "Bultos 50kg")
-        with c2:
-            st.metric("Cal", f"{m['cal']}", "Bultos 25kg")
-        with c3:
-            st.metric("Arena", f"{m['arena']}", "m³ (Lavada)")
+        with col_b:
+            if lc['techo']:
+                st.markdown('<div class="check-list">', unsafe_allow_html=True)
+                st.markdown('<p class="check-header">☂️ Cubierta Nelta</p>', unsafe_allow_html=True)
+                st.checkbox(f"{lc['techo']['tejas']} Tejas Termoacústicas (5.70m)", value=True)
+                st.checkbox(f"{lc['techo']['caballetes']} Caballetes", value=True)
+                st.checkbox(f"{lc['techo']['perfiles']} Perfiles C (Correas)", value=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            if lc.get('carpinteria') or lc.get('hidro'):
+                st.markdown('<div class="check-list">', unsafe_allow_html=True)
+                st.markdown('<p class="check-header">🚪 Acabados y Dotación</p>', unsafe_allow_html=True)
+                
+                # Carpintería
+                carp = lc.get('carpinteria', {})
+                if carp.get('p_ext'): st.checkbox(f"{carp['p_ext']} Puertas ppal. Seguridad", value=True)
+                if carp.get('p_int'): st.checkbox(f"{carp['p_int']} Puertas Interior Entamboradas", value=True)
+                if carp.get('vent'): st.checkbox(f"{carp['vent']} Ventanas Aluminio 1x1", value=True)
+                
+                # Hidro
+                hidro = lc.get('hidro', {})
+                if hidro.get('baños'): st.checkbox(f"{hidro['baños']} Kits Baño (Sanitario+Grifería)", value=True)
+                if hidro.get('cocina'): st.checkbox("1 Kit Lavaplatos + Grifería", value=True)
+                
+                # Varios
+                if lc['elec']: st.checkbox(f"{lc['elec']} Puntos Eléctricos (Material)", value=True)
+                if lc['area_piso']: st.checkbox(f"{lc['area_piso']} m² Microcemento (Acabado)", value=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        st.warning("⚠️ Nota: Las cantidades incluyen desperdicio técnico estimado. Verificar medidas en obra antes de comprar.")
+
+    with tab2:
+        st.metric("Precio Sugerido Venta", f"${datos['precio_venta']:,.0f}")
+        st.metric("Costo Directo", f"${datos['costo_directo']:,.0f}")
+        st.progress(0.7, text="Margen de Utilidad: 30%")
 
 st.markdown("---")
-st.caption("© 2026 Ferrotek | Precios actualizados Bucaramanga")
+st.caption("© 2026 Ferrotek | Sistema de Gestión de Materiales")

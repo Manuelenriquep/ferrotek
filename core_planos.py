@@ -1,5 +1,5 @@
 def dibujar_planta(modelo):
-    # Definición de Colores
+    # Colores
     c_muro = "#2C3E50"    
     c_fondo = "#F9F9F9"   
     c_social = "#FCF3CF"  
@@ -7,17 +7,19 @@ def dibujar_planta(modelo):
     c_bano = "#D6EAF8"    
     c_cocina = "#FAD7A0"  
     
-    # 1. Definir dimensiones primero
+    # 1. Definir tamaño del lienzo
     if modelo == 1: w, h = 5, 7
     elif modelo == 2: w, h = 5, 13
     elif modelo == 3: w, h = 10, 11
-    else: w, h = 5, 5 # Default
+    else: w, h = 5, 5
     
-    # 2. INICIAR LA ETIQUETA SVG (Esta es la clave para que se vea)
-    # Multiplicamos por 40 para convertir metros a pixeles
+    # --- AQUÍ ESTABA EL ERROR ---
+    # Antes tenías: svg = "" (Esto estaba mal)
+    # AHORA DEBE DECIR ESTO:
     svg = f'<svg width="100%" height="{h*45}" viewBox="0 0 {w*40} {h*40}" xmlns="http://www.w3.org/2000/svg">'
-    
-    # Función auxiliar para dibujar rectángulos
+    # ----------------------------
+
+    # Función auxiliar para dibujar
     def rect(x, y, w_rect, h_rect, color, texto, subtexto=""):
         scale = 40 
         rx, ry, rw, rh = x*scale, y*scale, w_rect*scale, h_rect*scale
@@ -33,7 +35,7 @@ def dibujar_planta(modelo):
         </g>
         """
 
-    # 3. DIBUJAR SEGÚN MODELO
+    # 2. Dibujar distribución
     if modelo == 1: 
         svg += rect(0, 0, 5, 1.5, c_cocina, "COCINA / ACCESO", "Kitchenette")
         svg += rect(0, 1.5, 5, 3.5, "#FFFFFF", "CAMA KING", "Vista Panorámica")
@@ -56,6 +58,7 @@ def dibujar_planta(modelo):
         svg += rect(7, 4, 3, 3, c_bano, "BAÑO", "Compartido")
         svg += rect(7, 7, 3, 4, c_hab, "HABITACIÓN 3", "Auxiliar")
 
-    # 4. CERRAR ETIQUETA
+    # 3. Cierre
     svg += "</svg>"
+    
     return svg

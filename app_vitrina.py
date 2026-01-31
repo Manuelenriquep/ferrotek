@@ -37,6 +37,25 @@ if datos:
     st.markdown(f"### {datos['nombre']}")
     st.caption(datos['descripcion'])
     
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"""
+        <div class="card">
+            <p class="price-tag">${datos['precio_venta']:,.0f}</p>
+            <small>Costo Directo: ${datos['costo_directo']:,.0f}</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        # VISUALIZADOR DE CAPACIDAD Y ALTURA
+        if categoria == "🐟 Estanques":
+             st.metric("💧 Capacidad", f"{datos['volumen_litros']:,} Litros")
+             st.metric("📏 Altura Muro", f"{datos['altura']} Metros")
+        else:
+             st.metric("📏 Area Construida", f"{datos['area']} m²")
+             if categoria == "⛺ Bóvedas":
+                 st.metric("🏠 Altura Cumbrera", f"{datos['altura']} Metros")
+
     # TABS
     tab1, tab2 = st.tabs(["🛒 Lista de Compras", "💰 Resumen Financiero"])
     
@@ -60,13 +79,15 @@ if datos:
             if lc['tubos'] > 0:
                 st.checkbox(f"{lc['tubos']} Tubos 50x50 (Muros/Vigas)", value=True)
             if lc['varillas'] > 0:
-                st.checkbox(f"{lc['varillas']} Varillas Corrugadas (Arcos)", value=True)
+                st.checkbox(f"{lc['varillas']} Varillas Corrugadas", value=True)
+            if lc['alambron'] > 0:
+                st.checkbox(f"{lc['alambron']} Kg Alambrón (4.2mm)", value=True)
             st.checkbox(f"{lc['malla']} Paneles Malla Electrosoldada", value=True)
             st.checkbox(f"{lc['zaranda']} Rollos Malla Gallinero (30m)", value=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col_b:
-            if lc.get('techo'): # Solo casas tienen techo Nelta aparte
+            if lc.get('techo'): 
                 st.markdown('<div class="check-list">', unsafe_allow_html=True)
                 st.markdown('<p class="check-header">☂️ Cubierta Nelta</p>', unsafe_allow_html=True)
                 st.checkbox(f"{lc['techo']['tejas']} Tejas Termoacústicas (5.70m)", value=True)
@@ -78,18 +99,15 @@ if datos:
                 st.markdown('<div class="check-list">', unsafe_allow_html=True)
                 st.markdown('<p class="check-header">🚪 Acabados y Dotación</p>', unsafe_allow_html=True)
                 
-                # Carpintería
                 carp = lc.get('carpinteria', {})
                 if carp.get('p_ext'): st.checkbox(f"{carp['p_ext']} Puertas ppal. Seguridad", value=True)
                 if carp.get('p_int'): st.checkbox(f"{carp['p_int']} Puertas Interior Entamboradas", value=True)
                 if carp.get('vent'): st.checkbox(f"{carp['vent']} Ventanas Aluminio", value=True)
                 
-                # Hidro
                 hidro = lc.get('hidro', {})
                 if hidro.get('baños'): st.checkbox(f"{hidro['baños']} Kits Baño (Sanitario+Grifería)", value=True)
                 if hidro.get('cocina'): st.checkbox("1 Kit Lavaplatos + Grifería", value=True)
                 
-                # Varios
                 if lc['elec']: st.checkbox(f"{lc['elec']} Puntos Eléctricos (Material)", value=True)
                 if lc['area_piso']: st.checkbox(f"{lc['area_piso']} m² Microcemento (Acabado)", value=True)
                 st.markdown('</div>', unsafe_allow_html=True)

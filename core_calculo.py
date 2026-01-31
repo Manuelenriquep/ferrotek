@@ -3,29 +3,22 @@ import math
 # --- CONFIGURACIÓN DE PRECIOS BUCARAMANGA (2026) ---
 PRECIOS = {
     # OBRA GRIS
-    'cemento': 28000,       # Bulto 50kg
-    'cal': 8000,            # Bulto 10kg
-    'arena': 90000,         # m3
-    'triturado': 110000,    # m3
-    'malla': 20000,         # Metro lineal (Panel 120k)
-    'varilla': 22000,       # Barra 6m
-    'tubo': 85000,          # Tubo 50x50mm
-    'perfil_c': 65000,      # Perfil C
-    'teja_570': 240000,     # Teja Nelta
-    'caballete': 25000,     
-    'zaranda': 220000,      # Rollo 30m
+    'cemento': 28000, 'cal': 8000, 'arena': 90000, 'triturado': 110000,
+    'malla': 20000, 'varilla': 22000, 'alambron_kg': 6500, 'tubo': 85000,
+    'perfil_c': 65000, 'teja_570': 240000, 'caballete': 25000, 'zaranda': 220000,
     
     # INSTALACIONES & ACABADOS
     'kit_bano': 1200000, 'kit_cocina': 600000, 'punto_elec': 40000,
     'microcemento': 28000, 'puerta_ext': 850000, 'puerta_int': 450000, 'ventana': 280000,
     
-    'mano_obra_m2': 180000
+    # MANO DE OBRA
+    'mo_casa': 180000, 'mo_estanque': 120000
 }
 
-def calcular_mezcla(area_m2, espesor_cm=3.5):
+def calcular_mezcla(area_m2, espesor_cm):
     volumen_m3 = area_m2 * (espesor_cm / 100)
     cemento = volumen_m3 * 8
-    cal = volumen_m3 * 25       # Bultos 10kg
+    cal = volumen_m3 * 25
     arena = volumen_m3 * 1.1
     costo = (cemento * PRECIOS['cemento']) + (cal * PRECIOS['cal']) + (arena * PRECIOS['arena'])
     return {'cemento': cemento, 'cal': cal, 'arena': arena, 'costo': costo}
@@ -35,11 +28,7 @@ def calcular_techo_casas(largo_casa):
     cant_caballetes = math.ceil(largo_casa / 0.80)
     metros_perfil = largo_casa * 8
     cant_perfiles = math.ceil(metros_perfil / 6.0)
-    
-    costo = (cant_tejas * PRECIOS['teja_570']) + \
-            (cant_caballetes * PRECIOS['caballete']) + \
-            (cant_perfiles * PRECIOS['perfil_c'])
-            
+    costo = (cant_tejas * PRECIOS['teja_570']) + (cant_caballetes * PRECIOS['caballete']) + (cant_perfiles * PRECIOS['perfil_c'])
     return {'costo': costo, 'cantidades': {'tejas': cant_tejas, 'caballetes': cant_caballetes, 'perfiles': cant_perfiles}}
 
 def calcular_carpinteria(modelo):
@@ -50,11 +39,10 @@ def calcular_carpinteria(modelo):
     costo = (p_ext * PRECIOS['puerta_ext']) + (p_int * PRECIOS['puerta_int']) + (vent * PRECIOS['ventana'])
     return {'costo': costo, 'cantidades': {'p_ext': p_ext, 'p_int': p_int, 'vent': vent}}
 
-def calcular_estructura(area_m2, tipo, largo_casa=0):
+def calcular_estructura(area_m2, tipo, largo_casa=0, dimension_estanque=0):
     paneles_malla = math.ceil(area_m2 * 0.35)
     rollos_zaranda = math.ceil(area_m2 / 27) 
-    cant_tubos = 0
-    cant_varillas = 0
+    cant_tubos, cant_varillas, cant_alambron = 0, 0, 0
     datos_techo = {'costo': 0, 'cantidades': {}}
 
     if tipo == "vivienda":
@@ -65,40 +53,32 @@ def calcular_estructura(area_m2, tipo, largo_casa=0):
         costo_est = cant_tubos * PRECIOS['tubo']
         datos_techo = calcular_techo_casas(largo_casa)
         costo_extra = datos_techo['costo']
-        detalle = f"{cant_tubos} Tubos 50x50mm + Techo Nelta"
+        detalle = f"{cant_tubos} Tubos + Techo Nelta"
         
     elif tipo == "boveda":
-        # LÓGICA MURETE TELESCOPICO:
-        # Arcos cada 50cm
         num_arcos = math.ceil(largo_casa / 0.50) + 1
-        
-        # 1. Varillas (Los Arcos Superiores) - 1 varilla de 6m por arco
         cant_varillas = num_arcos 
-        # + Varillas longitudinales de unión (7 líneas a lo largo)
         metros_longitudinales = largo_casa * 7
-        varillas_long = math.ceil(metros_longitudinales / 6.0)
-        cant_varillas += varillas_long
-
-        # 2. Tubos (Los Muretes de 0.90m)
-        # Cada arco necesita 2 tubos de base (uno a cada lado)
+        cant_varillas += math.ceil(metros_longitudinales / 6.0)
         num_tubos_murete = num_arcos * 2
         metros_tubos_murete = num_tubos_murete * 0.90
-        
-        # 3. Viga de Piso (Donde se sueldan los muretes)
-        # 2 líneas a lo largo de la bóveda
         metros_viga_piso = largo_casa * 2
-        
         total_metros_tubo = metros_tubos_murete + metros_viga_piso
         cant_tubos = math.ceil(total_metros_tubo / 6.0)
-        
         costo_est = (cant_varillas * PRECIOS['varilla']) + (cant_tubos * PRECIOS['tubo'])
         costo_extra = 0
-        detalle = f"{cant_tubos} Tubos (Muretes .90) + {cant_varillas} Varillas (Arcos)"
+        detalle = f"{cant_tubos} Tubos + {cant_varillas} Varillas"
 
     elif tipo == "estanque":
-        cant_varillas = math.ceil(area_m2 * 2.2)
-        costo_est = cant_varillas * PRECIOS['varilla']
-        detalle = f"{cant_varillas} Varillas Refuerzo"
+        if dimension_estanque <= 4:
+            cant_alambron = math.ceil(area_m2 * 1.5) 
+            costo_est = cant_alambron * PRECIOS['alambron_kg']
+            detalle = f"{cant_alambron} Kg Alambrón (4.2mm)"
+            paneles_malla = math.ceil(area_m2 * 0.15) 
+        else:
+            cant_varillas = math.ceil(area_m2 * 2.2)
+            costo_est = cant_varillas * PRECIOS['varilla']
+            detalle = f"{cant_varillas} Varillas Corrugadas"
         costo_extra = 0
 
     costo_mallas = (paneles_malla * PRECIOS['malla'] * 6) + (rollos_zaranda * PRECIOS['zaranda'])
@@ -109,6 +89,7 @@ def calcular_estructura(area_m2, tipo, largo_casa=0):
         'cantidades': {
             'malla': paneles_malla, 'zaranda': rollos_zaranda, 
             'tubos': cant_tubos, 'varillas': cant_varillas,
+            'alambron': cant_alambron,
             'techo': datos_techo.get('cantidades', {})
         }
     }
@@ -117,92 +98,86 @@ def generar_presupuesto(tipo, dimension):
     ancho_std = 5.00 
     costo_hidro, costo_elec, costo_carp = 0, 0, 0
     lista_compras = {}
+    precio_mo = PRECIOS['mo_estanque'] if tipo == "estanque" else PRECIOS['mo_casa']
+    espesor_muro = 3.5
     
+    # Variables de salida extra
+    volumen_litros = 0
+    altura_util = 0
+
     if tipo == "vivienda":
         if dimension == 1: largo, area_piso, pts_elec, kits_bano = 7.00, 35.0, 18, 1
         elif dimension == 2: largo, area_piso, pts_elec, kits_bano = 13.00, 65.0, 30, 1.5
         elif dimension == 3: largo, area_piso, pts_elec, kits_bano = 22.00, 110.0, 50, 2
-        
-        nombre = f"Modelo {dimension} - Vivienda Rural"
-        descripcion = "Llave en Mano (Inc. Carpintería y Redes)"
-        
+        nombre, descripcion = f"Modelo {dimension}", "Llave en Mano"
         costo_hidro = PRECIOS['kit_cocina'] + (PRECIOS['kit_bano'] * kits_bano)
         costo_elec = pts_elec * PRECIOS['punto_elec']
         carp = calcular_carpinteria(dimension)
         costo_carp = carp['costo']
-        
         perimetro = (ancho_std + largo) * 2
         area_total_fc = perimetro * 2.4 
-        
         lista_compras['hidro'] = {'baños': kits_bano, 'cocina': 1}
         lista_compras['elec'] = pts_elec
         lista_compras['carp'] = carp['cantidades']
+        altura_util = 2.40
 
     elif tipo == "estanque":
+        espesor_muro = 2.5
+        altura_util = 1.20 # Altura Estandarizada
         radio = dimension / 2
-        area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * 1.20)
-        nombre = f"Estanque Tilapia D={dimension}m"
-        descripcion = "Obra Gris + Impermeabilización"
+        
+        # CÁLCULO VOLUMEN (V = pi * r^2 * h)
+        volumen_m3 = math.pi * (radio**2) * altura_util
+        volumen_litros = volumen_m3 * 1000
+        
+        area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * altura_util)
+        
+        # NUEVO NOMBRE CON CAPACIDAD
+        nombre = f"Estanque {dimension}m ({int(volumen_litros):,} Litros)"
+        descripcion = f"Altura: {altura_util}m | Vol: {volumen_m3:.1f} m³"
+        
         area_piso = math.pi * (radio**2)
         largo = 0
 
     elif tipo == "boveda":
+        espesor_muro = 3.0 
         ancho_bov = 3.80
-        # Altura Murete (0.90) + Radio Arco (1.90) = Perímetro Sección Transversal
-        # Perimetro Arco = Pi * r = 5.97m.
-        # Muretes = 0.90 * 2 = 1.80m.
-        # Perímetro corte = 7.77m
-        
         perimetro_corte = (math.pi * (ancho_bov/2)) + (0.90 * 2)
         area_techo_muros = perimetro_corte * dimension
-        
-        # Tapas: Area semicírculo + Area rectangulo base (3.80 x 0.90)
         area_tapa = (math.pi * ((ancho_bov/2)**2) / 2) + (ancho_bov * 0.90)
         area_tapas = area_tapa * 2
-        
         area_total_fc = area_techo_muros + area_tapas
         area_piso = ancho_bov * dimension
         largo = dimension
+        altura_util = 2.80 # Altura cumbrera
         
-        # Configuración Bodega vs Suite
         if dimension == 3:
-            nombre = "Bóveda 3m (Bodega/Refugio)"
-            descripcion = "Murete 90cm | Sin Baño"
-            costo_elec = 3 * PRECIOS['punto_elec']
-            costo_carp = PRECIOS['puerta_ext'] + PRECIOS['ventana'] # Puerta + Ventana
-            lista_compras['elec'] = 3
-            lista_compras['carp'] = {'p_ext': 1, 'p_int': 0, 'vent': 1}
+            nombre, descripcion = "Bóveda 3m (Bodega)", "Murete 90cm | Sin Baño"
+            costo_elec, costo_carp = 3 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['ventana']
+            lista_compras['elec'], lista_compras['carp'] = 3, {'p_ext': 1, 'p_int': 0, 'vent': 1}
         else:
-            nombre = "Bóveda 6m (Glamping Suite)"
-            descripcion = "Murete 90cm | Con Baño Privado"
-            costo_elec = 8 * PRECIOS['punto_elec']
-            # Puerta Principal + Puerta Baño + Ventana Grande + Kit Baño
-            costo_carp = PRECIOS['puerta_ext'] + PRECIOS['puerta_int'] + (PRECIOS['ventana']*2)
+            nombre, descripcion = "Bóveda 6m (Suite)", "Murete 90cm | Con Baño"
+            costo_elec, costo_carp = 8 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['puerta_int'] + (PRECIOS['ventana']*2)
             costo_hidro = PRECIOS['kit_bano']
-            lista_compras['elec'] = 8
-            lista_compras['carp'] = {'p_ext': 1, 'p_int': 1, 'vent': 2}
-            lista_compras['hidro'] = {'baños': 1}
+            lista_compras['elec'], lista_compras['carp'], lista_compras['hidro'] = 8, {'p_ext': 1, 'p_int': 1, 'vent': 2}, {'baños': 1}
 
-    mezcla = calcular_mezcla(area_total_fc)
-    estructura = calcular_estructura(area_total_fc, tipo, largo)
+    mezcla = calcular_mezcla(area_total_fc, espesor_muro)
+    dim_est = dimension if tipo == "estanque" else 0
+    estructura = calcular_estructura(area_total_fc, tipo, largo, dim_est)
     
-    # PISO MICROCEMENTO
     costo_piso_concreto = 0
     materiales_piso = {'cemento':0, 'arena':0, 'triturado':0}
-    
     if tipo in ["vivienda", "boveda"]:
         if tipo == "vivienda": area_real_piso = area_piso
         else: area_real_piso = ancho_bov * dimension
-        
         vol_piso = area_real_piso * 0.08 
         c_piso, a_piso, t_piso = vol_piso*7, vol_piso*0.6, vol_piso*0.8
         materiales_piso = {'cemento': c_piso, 'arena': a_piso, 'triturado': t_piso}
-        
         base = vol_piso * (PRECIOS['cemento']*7 + PRECIOS['arena']*0.6 + PRECIOS['triturado']*0.8)
         acabado = area_real_piso * PRECIOS['microcemento']
         costo_piso_concreto = base + acabado
 
-    mano_obra = area_total_fc * PRECIOS['mano_obra_m2']
+    mano_obra = area_total_fc * precio_mo
     costo_directo = mezcla['costo'] + estructura['costo'] + mano_obra + \
                     costo_piso_concreto + costo_hidro + costo_elec + costo_carp
     precio_venta = costo_directo * 1.30
@@ -214,6 +189,8 @@ def generar_presupuesto(tipo, dimension):
         'nombre': nombre,
         'descripcion': descripcion,
         'area': round(area_piso if tipo == "vivienda" else area_total_fc, 1),
+        'volumen_litros': int(volumen_litros), # Nueva Variable
+        'altura': altura_util, # Nueva Variable
         'costo_directo': int(costo_directo),
         'precio_venta': int(precio_venta),
         'lista_compras': {
@@ -225,6 +202,7 @@ def generar_presupuesto(tipo, dimension):
             'zaranda': estructura['cantidades']['zaranda'],
             'tubos': estructura['cantidades']['tubos'],
             'varillas': estructura['cantidades']['varillas'],
+            'alambron': estructura['cantidades'].get('alambron', 0),
             'techo': estructura['cantidades'].get('techo', {}),
             'carpinteria': lista_compras.get('carp', {}),
             'hidro': lista_compras.get('hidro', {}),

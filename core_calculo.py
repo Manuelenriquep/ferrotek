@@ -3,26 +3,37 @@ import math
 # --- CONFIGURACIÓN DE PRECIOS BUCARAMANGA (2026) ---
 PRECIOS = {
     # OBRA GRIS
-    'cemento': 28000, 'cal': 16000, 'arena': 90000, 'triturado': 110000,
-    'malla': 20000, 'varilla': 22000, 'tubo': 85000, 'perfil_c': 65000,
-    'teja_570': 240000, 'caballete': 25000, 'zaranda': 220000,
-    # INSTALACIONES
+    'cemento': 28000,       # Bulto 50kg
+    'cal': 8000,            # Bulto 10kg (CORREGIDO)
+    'arena': 90000,         # m3
+    'triturado': 110000,    # m3
+    'malla': 20000,         # Metro lineal
+    'varilla': 22000,       # Barra 6m
+    'tubo': 85000,          # Tubo 50x50mm
+    'perfil_c': 65000,      # Perfil C
+    'teja_570': 240000,     # Teja Nelta
+    'caballete': 25000,     
+    'zaranda': 220000,      # Rollo 30m
+    
+    # INSTALACIONES & ACABADOS
     'kit_bano': 1200000, 'kit_cocina': 600000, 'punto_elec': 40000,
-    # ACABADOS
     'microcemento': 28000, 'puerta_ext': 850000, 'puerta_int': 450000, 'ventana': 280000,
+    
     'mano_obra_m2': 180000
 }
 
 def calcular_mezcla(area_m2, espesor_cm=3.5):
     volumen_m3 = area_m2 * (espesor_cm / 100)
-    cemento = volumen_m3 * 8
-    cal = volumen_m3 * 10
-    arena = volumen_m3 * 1.1
+    
+    # RENDIMIENTOS
+    cemento = volumen_m3 * 8    # Bultos 50kg
+    cal = volumen_m3 * 25       # Bultos 10kg (Ajustado: antes era *10 para 25kg)
+    arena = volumen_m3 * 1.1    # m3
+    
     costo = (cemento * PRECIOS['cemento']) + (cal * PRECIOS['cal']) + (arena * PRECIOS['arena'])
     return {'cemento': cemento, 'cal': cal, 'arena': arena, 'costo': costo}
 
 def calcular_techo_casas(largo_casa):
-    # Teja Nelta 5.70m
     cant_tejas = math.ceil(largo_casa / 1.0) 
     cant_caballetes = math.ceil(largo_casa / 0.80)
     metros_perfil = largo_casa * 8
@@ -77,7 +88,7 @@ def calcular_estructura(area_m2, tipo, largo_casa=0):
         'cantidades': {
             'malla': paneles_malla, 'zaranda': rollos_zaranda, 
             'tubos': cant_tubos, 'varillas': cant_varillas,
-            'techo': datos_techo['cantidades']
+            'techo': datos_techo.get('cantidades', {})
         }
     }
 
@@ -102,7 +113,6 @@ def generar_presupuesto(tipo, dimension):
         perimetro = (ancho_std + largo) * 2
         area_total_fc = perimetro * 2.4 
         
-        # Datos para lista de compras
         lista_compras['hidro'] = {'baños': kits_bano, 'cocina': 1}
         lista_compras['elec'] = pts_elec
         lista_compras['carp'] = carp['cantidades']
@@ -140,11 +150,10 @@ def generar_presupuesto(tipo, dimension):
         else: area_real_piso = ancho_bov * dimension
         
         vol_piso = area_real_piso * 0.08 
-        # Materiales para el piso (concreto 3000 PSI)
+        
         c_piso = vol_piso * 7
         a_piso = vol_piso * 0.6
         t_piso = vol_piso * 0.8
-        
         materiales_piso = {'cemento': c_piso, 'arena': a_piso, 'triturado': t_piso}
         
         base = vol_piso * (PRECIOS['cemento']*7 + PRECIOS['arena']*0.6 + PRECIOS['triturado']*0.8)
@@ -156,7 +165,6 @@ def generar_presupuesto(tipo, dimension):
                     costo_piso_concreto + costo_hidro + costo_elec + costo_carp
     precio_venta = costo_directo * 1.30
 
-    # CONSOLIDAR MATERIALES TOTALES
     total_cemento = mezcla['cemento'] + materiales_piso['cemento']
     total_arena = mezcla['arena'] + materiales_piso['arena']
     
@@ -179,6 +187,6 @@ def generar_presupuesto(tipo, dimension):
             'carpinteria': lista_compras.get('carp', {}),
             'hidro': lista_compras.get('hidro', {}),
             'elec': lista_compras.get('elec', 0),
-            'area_piso': round(area_piso if tipo != "estanque" else 0, 1) # Para microcemento
+            'area_piso': round(area_piso if tipo != "estanque" else 0, 1)
         }
     }

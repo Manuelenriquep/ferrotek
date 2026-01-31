@@ -7,20 +7,20 @@ PRECIOS = {
     'arena': 90000,         # m3
     'triturado': 110000,    # m3
     
-    # ESTRUCTURA
-    'malla': 20000,         # Metro lineal (Base: Panel $120.000 / 6m)
-    'varilla': 22000,       # Barra 6m
-    'tubo': 85000,          # Tubo estructural 6m
-    'perfil_c': 65000,      # Perfil C correas
+    # ESTRUCTURA METALICA
+    'malla': 20000,         # Metro lineal (Panel $120k / 6m)
+    'varilla': 22000,       # Barra 6m (Refuerzos)
+    'tubo': 85000,          # Tubo 50x50mm (Muros y Vigas)
+    'perfil_c': 65000,      # Perfil C (Correas Techo Nelta)
     
     # CUBIERTA & ACABADOS
-    'teja_570': 240000,     # Teja Termoacústica 5.70m (Garantía 10 años)
-    'caballete': 25000,     # Unidad
+    'teja_570': 240000,     # Teja Nelta Termoacústica 5.70m
+    'caballete': 25000,     # Caballete Nelta
     'zaranda': 220000,      # Rollo de 30m x 0.90m
     
     # OTROS
-    'kit_h_bano': 800000,   # Hidrosanitario por baño
-    'mano_obra_m2': 180000  # Global estimado
+    'kit_h_bano': 800000,   # Hidrosanitario
+    'mano_obra_m2': 180000  # Todo costo
 }
 
 # --- 1. CÁLCULO MEZCLA FERROCEMENTO (1:3:3) ---
@@ -32,26 +32,36 @@ def calcular_mezcla(area_m2, espesor_cm=3.5):
     costo = (cemento * PRECIOS['cemento']) + (cal * PRECIOS['cal']) + (arena * PRECIOS['arena'])
     return {'cemento': cemento, 'cal': cal, 'arena': arena, 'costo': costo}
 
-# --- 2. CÁLCULO DE TECHO (PREMIUM) ---
+# --- 2. CÁLCULO DE TECHO (NORMA NELTA) ---
 def calcular_techo_casas(largo_casa):
-    # Teja 5.70m Termoacústica
+    # Teja Nelta 5.70m (Se corta a la mitad = 2.85m por agua)
+    # Pendiente ideal Nelta: 27% - 30%
+    
+    # 1. Cantidad de Tejas (Ancho útil 1.00m traslapado)
     cantidad_tejas = math.ceil(largo_casa / 1.0) 
+    
+    # 2. Caballetes (Largo útil 0.80m)
     cantidad_caballetes = math.ceil(largo_casa / 0.80)
-    metros_correa = largo_casa * 6
-    total_perfiles_c = math.ceil(metros_correa / 6.0)
+    
+    # 3. Estructura Techo (Correas Perfil C)
+    # Norma Nelta: Apoyos máx cada 1.15m.
+    # Para caída de 2.85m necesitamos 4 correas por lado (Cumbrera, 2 Medias, Alero)
+    # Total filas de correas = 8
+    metros_perfil_c = largo_casa * 8
+    total_perfiles_c = math.ceil(metros_perfil_c / 6.0) # Barras de 6m
     
     costo_techo = (cantidad_tejas * PRECIOS['teja_570']) + \
                   (cantidad_caballetes * PRECIOS['caballete']) + \
                   (total_perfiles_c * PRECIOS['perfil_c'])
                   
     return {
-        'detalle': f"Cubierta Termoacústica (Garantía 10 Años) - {cantidad_tejas} Unidades de 5.70m",
+        'detalle': f"Cubierta Nelta Termoacústica (Garantía 10 Años) + Estructura Perfil C",
         'tejas': cantidad_tejas,
         'perfiles': total_perfiles_c,
         'costo': costo_techo
     }
 
-# --- 3. CÁLCULO ESTRUCTURAL (RIGIDEZ 50CM) ---
+# --- 3. CÁLCULO ESTRUCTURAL (MUROS 50x50mm) ---
 def calcular_estructura(area_m2, tipo, largo_casa=0):
     costo_extra = 0
     detalle = ""
@@ -62,26 +72,28 @@ def calcular_estructura(area_m2, tipo, largo_casa=0):
         ancho = 5.00
         perimetro = (ancho + largo_casa) * 2
         
-        # LÓGICA RIGIDEZ: Parales cada 50cm (0.50m)
+        # A. PARALES VERTICALES (Cada 50cm para rigidez)
         num_parales = math.ceil(perimetro / 0.50)
-        
-        # Cada paral mide 3.00m de altura (se saca medio tubo de 6m)
+        # Se cortan de 3.0m (2.40m libres + 60cm anclaje/desperdicio)
         metros_parales = num_parales * 3.0
         
-        # Vigas: Cinta superior e inferior (perimetrales)
+        # B. VIGAS DE AMARRE 50x50mm (Horizontal)
+        # 1. Viga Inferior (Cimentación)
+        # 2. Viga Superior (A 2.40m de altura - Corona)
         metros_vigas = perimetro * 2
         
-        # Total Tubos de 6m
-        total_metros = metros_parales + metros_vigas
-        cant_tubos = math.ceil(total_metros / 6.0)
+        # C. TOTAL TUBERÍA 50x50mm
+        total_metros_tubo = metros_parales + metros_vigas
+        cant_tubos = math.ceil(total_metros_tubo / 6.0)
         
-        # Factor de seguridad 10% (cortes y marcos puertas/ventanas)
+        # Factor desperdicio y refuerzos marcos (10%)
         cant_tubos = math.ceil(cant_tubos * 1.10)
 
         costo_est = cant_tubos * PRECIOS['tubo']
         datos_techo = calcular_techo_casas(largo_casa)
         costo_extra = datos_techo['costo']
-        detalle = f"{cant_tubos} Tubos Estructurales (Parales c/50cm) + {datos_techo['detalle']}"
+        
+        detalle = f"{cant_tubos} Tubos 50x50mm (Parales c/50cm + Viga Amarre 2.40m) + Techo Nelta"
         
     elif tipo == "boveda":
         cant_varillas = math.ceil(area_m2 * 1.5)
@@ -113,17 +125,17 @@ def generar_presupuesto(tipo, dimension):
         if dimension == 1: 
             largo, area_piso = 7.00, ancho_std * 7.00
             nombre = "Modelo 1: Suite (35 m²)"
-            descripcion = "1 Hab / 1 Baño | Cubierta Termoacústica"
+            descripcion = "1 Hab / 1 Baño | Techo Nelta"
             costo_hidrosanitario = PRECIOS['kit_h_bano'] * 1
         elif dimension == 2: 
             largo, area_piso = 13.00, ancho_std * 13.00
             nombre = "Modelo 2: Cotidiana (65 m²)"
-            descripcion = "2 Hab / 1.5 Baños | Cubierta Termoacústica"
+            descripcion = "2 Hab / 1.5 Baños | Techo Nelta"
             costo_hidrosanitario = PRECIOS['kit_h_bano'] * 1.5
         elif dimension == 3: 
             largo, area_piso = 22.00, 110.0
             nombre = "Modelo 3: Patriarca (110 m²)"
-            descripcion = "3 Hab / 2 Baños | Cubierta Termoacústica"
+            descripcion = "3 Hab / 2 Baños | Techo Nelta"
             costo_hidrosanitario = PRECIOS['kit_h_bano'] * 2
         
         perimetro = (ancho_std + largo) * 2
@@ -134,7 +146,7 @@ def generar_presupuesto(tipo, dimension):
         altura = 1.20
         area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * 1.20)
         nombre = f"Estanque Tilapia D={dimension}m"
-        descripcion = "Altura 1.20m | Piso FC | Alta Resistencia"
+        descripcion = "Altura 1.20m | Piso FC"
         largo = 0
 
     elif tipo == "boveda":
@@ -142,7 +154,7 @@ def generar_presupuesto(tipo, dimension):
         radio = ancho_bov / 2
         area_total_fc = (math.pi * radio * dimension) + (math.pi * (radio**2)) + (ancho_bov * dimension)
         nombre = f"Bóveda {dimension}m Fondo"
-        descripcion = "Ancho 3.80m | Inc. Piso y Tapas"
+        descripcion = "Ancho 3.80m | Inc. Piso/Tapas"
         area_piso = ancho_bov * dimension
         largo = dimension
 

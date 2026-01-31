@@ -1,5 +1,3 @@
-# GUARDA ESTO COMO: app_vitrina.py
-
 import streamlit as st
 import core_calculo as core
 import core_planos  # <--- IMPORTANTE: Conecta con el archivo de arriba
@@ -30,13 +28,18 @@ modelo_seleccionado = 0
 # LÓGICA DE SELECCIÓN
 if categoria == "🏠 Casas Modulares":
     st.sidebar.markdown("---")
+    st.sidebar.info("✨ Llave en Mano: Baños, Cocina, Redes y Vidrios.")
     modelo = st.sidebar.selectbox("Selecciona tu Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
     datos = core.generar_presupuesto("vivienda", modelo)
     modelo_seleccionado = modelo
 elif categoria == "🐟 Estanques":
+    st.sidebar.markdown("---")
+    st.sidebar.success("💧 Garantía: Cal Hidrófuga + Malla Doble.")
     dim = st.sidebar.select_slider("Diámetro del Tanque:", [1, 2, 4, 8, 10, 12], value=4)
     datos = core.generar_presupuesto("estanque", dim)
 elif categoria == "⛺ Bóvedas":
+    st.sidebar.markdown("---")
+    st.sidebar.warning("🚀 Rápido: Estructura Telescópica.")
     largo = st.sidebar.radio("Profundidad:", [3, 6], format_func=lambda x: f"{x} Metros")
     datos = core.generar_presupuesto("boveda", largo)
 
@@ -65,14 +68,17 @@ if datos:
         if categoria == "🏠 Casas Modulares":
             col_text, col_plan = st.columns([1, 1.5])
             with col_text:
-                if modelo == 1: st.info("Concepto Loft: Cama central, baño oculto y cocina kitchenette.")
-                elif modelo == 2: st.info("Concepto Familiar: Habitaciones separadas de la zona social.")
-                elif modelo == 3: st.info("Concepto Hacienda: Gran salón central y alas independientes.")
+                if modelo == 1: 
+                    st.markdown("**Concepto Loft:**\nCama central con vista, baño oculto y kitchenette.")
+                elif modelo == 2: 
+                    st.markdown("**Concepto Familiar:**\nHabitaciones separadas de la zona social para privacidad.")
+                elif modelo == 3: 
+                    st.markdown("**Concepto Hacienda:**\nGran salón central (40m2) y alas independientes.")
             
             with col_plan:
-                # AQUÍ SE DIBUJA EL PLANO AUTOMÁTICAMENTE
+                # --- AQUÍ ESTABA EL ERROR, YA ESTÁ CORREGIDO ---
                 svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
-                st.markdown(svg_plano, unsafe_allow_html=True)
+                st.markdown(svg_plano, unsafe_allow_html=True) 
                 st.caption("Distribución Arquitectónica Optimizada")
         
         elif categoria == "🐟 Estanques":

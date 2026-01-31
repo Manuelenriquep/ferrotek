@@ -1,5 +1,6 @@
 import streamlit as st
 import core_calculo as core
+import core_planos # <--- ESTA ES LA CONEXIÓN NUEVA
 
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
 
@@ -15,7 +16,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Encabezado
 st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural", use_container_width=True)
 
 # --- MENÚ LATERAL ---
@@ -24,6 +24,7 @@ categoria = st.sidebar.radio("¿Qué deseas construir?",
     ["🏠 Casas Modulares", "🐟 Estanques Piscícolas", "⛺ Bóvedas Glamping"])
 
 datos = None
+modelo_seleccionado = 0 
 
 # --- LÓGICA DE CASAS ---
 if categoria == "🏠 Casas Modulares":
@@ -32,6 +33,7 @@ if categoria == "🏠 Casas Modulares":
     modelo = st.sidebar.selectbox("Selecciona tu Modelo:", [1, 2, 3], 
         format_func=lambda x: f"Modelo {x} ({['Suite 35m²', 'Cotidiana 65m²', 'Patriarca 110m²'][x-1]})")
     datos = core.generar_presupuesto("vivienda", modelo)
+    modelo_seleccionado = modelo
 
 # --- LÓGICA DE ESTANQUES ---
 elif categoria == "🐟 Estanques":
@@ -49,11 +51,9 @@ elif categoria == "⛺ Bóvedas":
 
 # --- VISUALIZACIÓN DE RESULTADOS ---
 if datos:
-    # Título del Producto
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
 
-    # Métricas Clave (Top Bar)
     c1, c2, c3 = st.columns(3)
     if categoria == "🐟 Estanques":
         c1.metric("💧 Capacidad", f"{datos['volumen_litros']:,} L")
@@ -66,74 +66,63 @@ if datos:
 
     st.markdown("---")
 
-    # --- PESTAÑAS DE CONTENIDO ---
     tab_diseno, tab_financiero, tab_compras = st.tabs(["📐 Distribución y Diseño", "💰 Inversión", "🛒 Lista de Materiales"])
 
-    # 1. PESTAÑA DE DISEÑO (TEXTOS DE VENTA)
+    # 1. PESTAÑA DE DISEÑO (CON PLANOS SVG)
     with tab_diseno:
         if categoria == "🏠 Casas Modulares":
-            if modelo == 1: # SUITE 35m2
-                st.markdown("""
-                ### 🌟 Concepto: "El Refugio Inteligente"
-                Diseñado para el **Glamping de Lujo** o la **Vivienda de Soltero**. Este modelo maximiza cada centímetro cúbico.
-                
-                * **Fachada Moderna:** Techo a un agua con pendiente optimizada para la teja Nelta de 5.70m (Cero desperdicio, Cero goteras).
-                * **Planta Libre (Loft):** Sin muros internos innecesarios. La luz cruza de lado a lado.
-                * **Baño Spa:** Un baño sorprendentemente amplio (1.50m x 3.00m) que permite acabados de lujo.
-                
-                **📍 Distribución Sugerida:**
-                > Entrada lateral -> Cocina compacta (Kitchenette) -> Zona de Cama King con vista al ventanal de fondo -> Baño privado detrás de la cabecera.
-                """)
-                st.image("https://via.placeholder.com/600x300.png?text=Planta+Tipo+Loft+35m2", use_container_width=True)
+            col_text, col_plan = st.columns([1, 1.5]) 
+            
+            with col_text:
+                if modelo == 1:
+                    st.markdown("""
+                    ### 🌟 "El Refugio Inteligente"
+                    **Ideal para Glamping o Solteros.**
+                    * **Fachada:** Techo a un agua (5.70m).
+                    * **Loft:** Sin muros internos que corten la luz.
+                    * **Baño Oculto:** Detrás del cabecero para máxima estética.
+                    """)
+                elif modelo == 2:
+                    st.markdown("""
+                    ### 🏡 "La Casa Funcional"
+                    **Ideal Familia Pequeña.**
+                    * **Clima:** 5m de ancho = Ventilación total.
+                    * **Privacidad:** Habitaciones separadas de la sala.
+                    * **Acabados:** Piso microcemento industrial.
+                    """)
+                elif modelo == 3:
+                    st.markdown("""
+                    ### 🏰 "La Hacienda Moderna"
+                    **Vivienda Definitiva.**
+                    * **Volumen:** Techo catedral a dos aguas.
+                    * **Social:** Sala-Comedor de 40m².
+                    * **Master:** Suite privada en ala independiente.
+                    """)
+            
+            with col_plan:
+                # --- DIBUJANDO EL PLANO ---
+                try:
+                    svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
+                    st.markdown(svg_plano, unsafe_allow_html=True)
+                    st.caption("Plano de distribución arquitectónica.")
+                except Exception as e:
+                    st.error(f"Error dibujando plano: {e}. Verifica core_planos.py")
 
-            elif modelo == 2: # COTIDIANA 65m2
-                st.markdown("""
-                ### 🏡 Concepto: "La Casa Funcional"
-                El equilibrio perfecto entre costo y habitabilidad. Ideal para **Familias Pequeñas** o **Renta Rural**.
-                
-                * **Eficiencia Térmica:** Al tener 5 metros de ancho, logramos ventilación cruzada perfecta. La casa es fresca todo el día.
-                * **Privacidad:** El diseño separa las habitaciones de la zona social mediante un pasillo o núcleo húmedo.
-                * **Acabados:** El piso en microcemento le da un toque industrial y limpio, fácil de barrer y trapear en el campo.
-                
-                **📍 Distribución Sugerida:**
-                > Sala-Comedor al frente (Amplitud) -> Cocina abierta con barra -> Pasillo central -> Baño social completo -> Dos habitaciones gemelas al fondo (Silencio y descanso).
-                """)
-                st.image("https://via.placeholder.com/600x300.png?text=Planta+2+Habitaciones+65m2", use_container_width=True)
-
-            elif modelo == 3: # PATRIARCA 110m2
-                st.markdown("""
-                ### 🏰 Concepto: "La Hacienda Moderna"
-                Una vivienda definitiva. Espacios anchos, techos altos y la solidez de una fortaleza.
-                
-                * **Techo Catedral:** Estructura a dos aguas (10m de ancho) que genera un volumen interior imponente y fresco.
-                * **Zona Social Gigante:** Sala y comedor integrados de casi 40m² para reunir a toda la familia.
-                * **Master Suite:** Habitación principal con baño privado y espacio para clóset de pared a pared.
-                
-                **📍 Distribución Sugerida:**
-                > Acceso Central -> Gran Salón Social -> Cocina en "L" con Isla -> Ala Derecha: 2 Habitaciones + Baño Auxiliar -> Ala Izquierda: Master Suite Privada.
-                """)
-                st.image("https://via.placeholder.com/600x300.png?text=Planta+3+Habitaciones+110m2", use_container_width=True)
-        
         elif categoria == "🐟 Estanques":
-             st.markdown(f"""
+             st.markdown("""
              ### 🌊 Tecnología: Ferrocemento vs. Plástico
-             Usted no está comprando un tanque, está comprando **Tranquilidad para sus peces**.
-             
-             1. **Temperatura Estable:** A diferencia de los tanques plásticos azules que se calientan con el sol, el cemento mantiene el agua fresca. **Agua fresca = Más oxígeno = Peces más gordos.**
-             2. **Eterno:** El plástico se cristaliza y se rompe a los 5 años. Este tanque es de piedra y acero. Dura para siempre.
-             3. **Sanidad:** Nuestro mortero incluye **Cal Hidrófuga**, que evita hongos y facilita el lavado.
-             
-             **Ideal para:** Tilapia, Trucha, Reserva de Agua de Riego.
+             * **Temperatura:** El cemento aísla, el plástico calienta. Agua fresca = Peces sanos.
+             * **Durabilidad:** Piedra eterna vs. Plástico que se cristaliza en 5 años.
+             * **Sanidad:** Cal Hidrófuga evita hongos.
              """)
+             st.info("💡 El diseño circular auto-soporta la presión del agua, reduciendo la necesidad de hierro costoso.")
 
         elif categoria == "⛺ Bóvedas":
              st.markdown("""
-             ### ⛺ Concepto: "Glamping Indestructible"
-             La forma más eficiente de la naturaleza (el arco) llevada a la construcción.
-             
-             * **Altura Confort:** Gracias a nuestro sistema de muretes de 90cm, la altura central es de **2.80m**. Nada de agacharse.
-             * **Rápido:** Se arma la estructura en 2 días.
-             * **Seguro:** A diferencia de una carpa de lona, esto no se rasga, no se lo comen los ratones y aísla el ruido de la lluvia.
+             ### ⛺ "Glamping Indestructible"
+             * **Altura:** 2.80m en el centro (Muretes de 90cm).
+             * **Resistencia:** No se rasga como la lona, no suena con la lluvia.
+             * **Rápido:** Montaje de estructura en 48 horas.
              """)
 
     # 2. PESTAÑA FINANCIERA
@@ -149,16 +138,15 @@ if datos:
             """, unsafe_allow_html=True)
         
         with col_fin2:
-            st.markdown("#### 📊 Desglose de Costos (Transparencia)")
+            st.markdown("#### 📊 Desglose de Costos")
             st.write(f"**Materiales y Equipos:** ${datos['costo_directo']*0.75:,.0f}")
             st.write(f"**Mano de Obra Exp.:** ${datos['costo_directo']*0.25:,.0f}")
-            st.info("💡 Este precio incluye imprevistos y gestión. No incluye viáticos si la obra es fuera del área metropolitana.")
+            st.info("💡 Precio asume terreno plano y acceso vehicular.")
 
-    # 3. PESTAÑA DE COMPRAS (CHECKLIST)
+    # 3. PESTAÑA DE COMPRAS
     with tab_compras:
         lc = datos['lista_compras']
         st.markdown("#### 📋 Listado Maestro de Insumos")
-        
         c_a, c_b = st.columns(2)
         
         with c_a:
@@ -198,7 +186,7 @@ if datos:
                 
                 hidro = lc.get('hidro', {})
                 if hidro.get('baños'): st.checkbox(f"{hidro['baños']} Kits Baño Completos", value=True)
-                if hidro.get('cocina'): st.checkbox("1 Kit Cocina (Poceta+Grifería)", value=True)
+                if hidro.get('cocina'): st.checkbox("1 Kit Cocina", value=True)
                 if lc['elec']: st.checkbox(f"{lc['elec']} Puntos Eléctricos", value=True)
                 if lc['area_piso']: st.checkbox(f"{lc['area_piso']} m² Microcemento", value=True)
                 st.markdown('</div>', unsafe_allow_html=True)

@@ -1,20 +1,26 @@
 import math
 
-# --- CONFIGURACIÓN DE PRECIOS BUCARAMANGA (PREMIUM 2026) ---
+# --- CONFIGURACIÓN DE PRECIOS BUCARAMANGA (REALES 2026) ---
 PRECIOS = {
-    'cemento': 28000,       
-    'cal': 16000,           
-    'arena': 90000,         
-    'triturado': 110000,    
-    'malla': 12000,         
-    'varilla': 22000,       
-    'tubo': 85000,          
-    'perfil_c': 65000,      
-    'teja_570': 240000,     # Teja Termoacústica Premium
-    'caballete': 25000,     
-    'zaranda': 150000,      
-    'kit_h_bano': 800000,   
-    'mano_obra_m2': 180000  
+    'cemento': 28000,       # Bulto 50kg
+    'cal': 16000,           # Bulto 25kg (Vivacal)
+    'arena': 90000,         # m3
+    'triturado': 110000,    # m3
+    
+    # ESTRUCTURA
+    'malla': 20000,         # Metro lineal (Base: Panel $120.000 / 6m)
+    'varilla': 22000,       # Barra 6m
+    'tubo': 85000,          # Tubo estructural 6m
+    'perfil_c': 65000,      # Perfil C correas
+    
+    # CUBIERTA & ACABADOS
+    'teja_570': 240000,     # Teja Termoacústica 5.70m (Garantía 10 años)
+    'caballete': 25000,     # Unidad
+    'zaranda': 220000,      # Rollo de 30m x 0.90m
+    
+    # OTROS
+    'kit_h_bano': 800000,   # Hidrosanitario por baño
+    'mano_obra_m2': 180000  # Global estimado
 }
 
 # --- 1. CÁLCULO MEZCLA FERROCEMENTO (1:3:3) ---
@@ -39,26 +45,43 @@ def calcular_techo_casas(largo_casa):
                   (total_perfiles_c * PRECIOS['perfil_c'])
                   
     return {
-        # AQUÍ ESTÁ EL CAMBIO CLAVE EN EL TEXTO:
         'detalle': f"Cubierta Termoacústica (Garantía 10 Años) - {cantidad_tejas} Unidades de 5.70m",
         'tejas': cantidad_tejas,
         'perfiles': total_perfiles_c,
         'costo': costo_techo
     }
 
-# --- 3. CÁLCULO ESTRUCTURAL ---
+# --- 3. CÁLCULO ESTRUCTURAL (RIGIDEZ 50CM) ---
 def calcular_estructura(area_m2, tipo, largo_casa=0):
     costo_extra = 0
     detalle = ""
     paneles_malla = math.ceil(area_m2 * 0.35)
-    rollos_zaranda = math.ceil(area_m2 / 40)
+    rollos_zaranda = math.ceil(area_m2 / 27) 
     
     if tipo == "vivienda":
-        cant_tubos = math.ceil(area_m2 * 1.2)
+        ancho = 5.00
+        perimetro = (ancho + largo_casa) * 2
+        
+        # LÓGICA RIGIDEZ: Parales cada 50cm (0.50m)
+        num_parales = math.ceil(perimetro / 0.50)
+        
+        # Cada paral mide 3.00m de altura (se saca medio tubo de 6m)
+        metros_parales = num_parales * 3.0
+        
+        # Vigas: Cinta superior e inferior (perimetrales)
+        metros_vigas = perimetro * 2
+        
+        # Total Tubos de 6m
+        total_metros = metros_parales + metros_vigas
+        cant_tubos = math.ceil(total_metros / 6.0)
+        
+        # Factor de seguridad 10% (cortes y marcos puertas/ventanas)
+        cant_tubos = math.ceil(cant_tubos * 1.10)
+
         costo_est = cant_tubos * PRECIOS['tubo']
         datos_techo = calcular_techo_casas(largo_casa)
         costo_extra = datos_techo['costo']
-        detalle = f"{cant_tubos} Tubos Estructurales + {datos_techo['detalle']}"
+        detalle = f"{cant_tubos} Tubos Estructurales (Parales c/50cm) + {datos_techo['detalle']}"
         
     elif tipo == "boveda":
         cant_varillas = math.ceil(area_m2 * 1.5)
@@ -70,9 +93,15 @@ def calcular_estructura(area_m2, tipo, largo_casa=0):
         costo_est = cant_varillas * PRECIOS['varilla']
         detalle = f"{cant_varillas} Varillas (Refuerzo Hidráulico)"
 
-    costo_mallas = (paneles_malla * PRECIOS['malla'] * 6) + (rollos_zaranda * PRECIOS['zaranda'])
+    costo_mallas = (paneles_malla * PRECIOS['malla'] * 6) + \
+                   (rollos_zaranda * PRECIOS['zaranda'])
                    
-    return {'costo': int(costo_est + costo_mallas + costo_extra), 'detalle': detalle, 'malla': paneles_malla, 'zaranda': rollos_zaranda}
+    return {
+        'costo': int(costo_est + costo_mallas + costo_extra),
+        'detalle': detalle,
+        'malla': paneles_malla,
+        'zaranda': rollos_zaranda
+    }
 
 # --- 4. CONTROLADOR PRINCIPAL ---
 def generar_presupuesto(tipo, dimension):
@@ -102,6 +131,7 @@ def generar_presupuesto(tipo, dimension):
         
     elif tipo == "estanque":
         radio = dimension / 2
+        altura = 1.20
         area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * 1.20)
         nombre = f"Estanque Tilapia D={dimension}m"
         descripcion = "Altura 1.20m | Piso FC | Alta Resistencia"
@@ -121,10 +151,8 @@ def generar_presupuesto(tipo, dimension):
     
     costo_piso_concreto = 0
     if tipo in ["vivienda", "boveda"]:
-        # Asumiendo area_piso definida arriba
         if tipo == "vivienda": area_real_piso = area_piso
         else: area_real_piso = ancho_bov * dimension
-        
         vol_piso = area_real_piso * 0.08 
         costo_piso_concreto = vol_piso * (PRECIOS['cemento']*7 + PRECIOS['arena']*0.6 + PRECIOS['triturado']*0.8)
 
@@ -135,7 +163,7 @@ def generar_presupuesto(tipo, dimension):
     return {
         'nombre': nombre,
         'descripcion': descripcion,
-        'area': round(area_piso if tipo == "vivienda" else area_total_fc, 1), # Simplificado para visualización
+        'area': round(area_piso if tipo == "vivienda" else area_total_fc, 1),
         'costo_directo': int(costo_directo),
         'precio_venta': int(precio_venta),
         'materiales': {

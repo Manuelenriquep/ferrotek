@@ -15,12 +15,19 @@ PRECIOS = {
     'mo_casa': 180000, 'mo_estanque': 120000
 }
 
-def calcular_mezcla(area_m2, espesor_cm):
+def calcular_mezcla(area_m2, espesor_cm, tipo):
     volumen_m3 = area_m2 * (espesor_cm / 100)
-    cemento = volumen_m3 * 8
-    cal = volumen_m3 * 25
-    arena = volumen_m3 * 1.1
-    costo = (cemento * PRECIOS['cemento']) + (cal * PRECIOS['cal']) + (arena * PRECIOS['arena'])
+    
+    # RENDIMIENTOS ESTÁNDAR (Con Cal para todo)
+    cemento = volumen_m3 * 8     # Bultos 50kg
+    arena = volumen_m3 * 1.1     # m3
+    cal = volumen_m3 * 25        # Bultos 10kg (Cal Hidrofóbica/Hidratada)
+    
+    # Ya no usamos aditivo químico costoso, confiamos en la Cal
+    costo = (cemento * PRECIOS['cemento']) + \
+            (cal * PRECIOS['cal']) + \
+            (arena * PRECIOS['arena'])
+            
     return {'cemento': cemento, 'cal': cal, 'arena': arena, 'costo': costo}
 
 def calcular_techo_casas(largo_casa):
@@ -70,7 +77,12 @@ def calcular_estructura(area_m2, tipo, largo_casa=0, dimension_estanque=0):
         detalle = f"{cant_tubos} Tubos + {cant_varillas} Varillas"
 
     elif tipo == "estanque":
-        if dimension_estanque <= 4:
+        if dimension_estanque <= 1.5:
+            cant_alambron = math.ceil(area_m2 * 1.0) 
+            costo_est = cant_alambron * PRECIOS['alambron_kg']
+            detalle = f"{cant_alambron} Kg Alambrón (Ligero)"
+            paneles_malla = math.ceil(area_m2 * 0.15)
+        elif dimension_estanque <= 4:
             cant_alambron = math.ceil(area_m2 * 1.5) 
             costo_est = cant_alambron * PRECIOS['alambron_kg']
             detalle = f"{cant_alambron} Kg Alambrón (4.2mm)"
@@ -100,7 +112,6 @@ def generar_presupuesto(tipo, dimension):
     lista_compras = {}
     precio_mo = PRECIOS['mo_estanque'] if tipo == "estanque" else PRECIOS['mo_casa']
     espesor_muro = 3.5
-    
     volumen_litros = 0
     altura_util = 0
 
@@ -108,7 +119,7 @@ def generar_presupuesto(tipo, dimension):
         if dimension == 1: largo, area_piso, pts_elec, kits_bano = 7.00, 35.0, 18, 1
         elif dimension == 2: largo, area_piso, pts_elec, kits_bano = 13.00, 65.0, 30, 1.5
         elif dimension == 3: largo, area_piso, pts_elec, kits_bano = 22.00, 110.0, 50, 2
-        nombre, descripcion = f"Modelo {dimension}", "Llave en Mano"
+        nombre, descripcion = f"Modelo {dimension}", "Mortero Reforzado | Llave en Mano"
         costo_hidro = PRECIOS['kit_cocina'] + (PRECIOS['kit_bano'] * kits_bano)
         costo_elec = pts_elec * PRECIOS['punto_elec']
         carp = calcular_carpinteria(dimension)
@@ -124,16 +135,12 @@ def generar_presupuesto(tipo, dimension):
         espesor_muro = 2.5
         altura_util = 1.20 
         radio = dimension / 2
-        
-        # CÁLCULO VOLUMEN
         volumen_m3 = math.pi * (radio**2) * altura_util
         volumen_litros = volumen_m3 * 1000
-        
         area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * altura_util)
         
         nombre = f"Estanque D={dimension}m ({int(volumen_litros):,} Litros)"
-        descripcion = f"Comparativa vs Plástico | Vol: {volumen_m3:.1f} m³"
-        
+        descripcion = f"Mortero con Cal Hidrófuga | Vol: {volumen_m3:.1f} m³"
         area_piso = math.pi * (radio**2)
         largo = 0
 
@@ -150,16 +157,18 @@ def generar_presupuesto(tipo, dimension):
         altura_util = 2.80 
         
         if dimension == 3:
-            nombre, descripcion = "Bóveda 3m (Bodega)", "Murete 90cm | Sin Baño"
+            nombre, descripcion = "Bóveda 3m (Bodega)", "Mortero Reforzado | Sin Baño"
             costo_elec, costo_carp = 3 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['ventana']
             lista_compras['elec'], lista_compras['carp'] = 3, {'p_ext': 1, 'p_int': 0, 'vent': 1}
         else:
-            nombre, descripcion = "Bóveda 6m (Suite)", "Murete 90cm | Con Baño"
+            nombre, descripcion = "Bóveda 6m (Suite)", "Mortero Reforzado | Con Baño"
             costo_elec, costo_carp = 8 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['puerta_int'] + (PRECIOS['ventana']*2)
             costo_hidro = PRECIOS['kit_bano']
             lista_compras['elec'], lista_compras['carp'], lista_compras['hidro'] = 8, {'p_ext': 1, 'p_int': 1, 'vent': 2}, {'baños': 1}
 
-    mezcla = calcular_mezcla(area_total_fc, espesor_muro)
+    # PASAR 'TIPO' PARA MEZCLA
+    mezcla = calcular_mezcla(area_total_fc, espesor_muro, tipo)
+    
     dim_est = dimension if tipo == "estanque" else 0
     estructura = calcular_estructura(area_total_fc, tipo, largo, dim_est)
     
@@ -175,10 +184,21 @@ def generar_presupuesto(tipo, dimension):
         acabado = area_real_piso * PRECIOS['microcemento']
         costo_piso_concreto = base + acabado
 
-    mano_obra = area_total_fc * precio_mo
-    costo_directo = mezcla['costo'] + estructura['costo'] + mano_obra + \
+    # MANO DE OBRA GLOBAL PARA ESTANQUES PEQUEÑOS
+    if tipo == "estanque" and dimension <= 1.5:
+        costo_mano_obra = 250000 
+    else:
+        costo_mano_obra = area_total_fc * precio_mo
+
+    costo_directo = mezcla['costo'] + estructura['costo'] + costo_mano_obra + \
                     costo_piso_concreto + costo_hidro + costo_elec + costo_carp
-    precio_venta = costo_directo * 1.30
+    
+    # MARGEN AGRESIVO PARA PRODUCTO GANCHO
+    margen = 1.30
+    if tipo == "estanque" and dimension <= 1.5:
+        margen = 1.25
+        
+    precio_venta = costo_directo * margen
 
     total_cemento = mezcla['cemento'] + materiales_piso['cemento']
     total_arena = mezcla['arena'] + materiales_piso['arena']

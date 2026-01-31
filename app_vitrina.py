@@ -26,7 +26,6 @@ if categoria == "🏠 Casas Modulares":
     modelo = st.sidebar.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
     datos = core.generar_presupuesto("vivienda", modelo)
 elif categoria == "🐟 Estanques":
-    # AQUÍ ESTÁ EL CAMBIO: AGREGADO EL "1" AL SLIDER
     dim = st.sidebar.select_slider("Diámetro:", [1, 2, 4, 8, 10, 12], value=4)
     datos = core.generar_presupuesto("estanque", dim)
 elif categoria == "⛺ Bóvedas":
@@ -68,7 +67,11 @@ if datos:
             st.markdown('<div class="check-list">', unsafe_allow_html=True)
             st.markdown('<p class="check-header">🧱 Obra Negra (Ferretería)</p>', unsafe_allow_html=True)
             st.checkbox(f"{lc['cemento']} Bultos Cemento (50kg)", value=True)
-            st.checkbox(f"{lc['cal']} Bultos Cal Hidratada (10kg)", value=True) 
+            
+            # Ahora la Cal aparece siempre si es > 0
+            if lc['cal'] > 0:
+                st.checkbox(f"{lc['cal']} Bultos Cal Hidratada (10kg)", value=True)
+            
             st.checkbox(f"{lc['arena']} m³ Arena de Río", value=True)
             if lc['triturado'] > 0:
                 st.checkbox(f"{lc['triturado']} m³ Triturado (Piso)", value=True)

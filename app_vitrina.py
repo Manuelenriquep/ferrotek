@@ -26,7 +26,8 @@ if categoria == "🏠 Casas Modulares":
     modelo = st.sidebar.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
     datos = core.generar_presupuesto("vivienda", modelo)
 elif categoria == "🐟 Estanques":
-    dim = st.sidebar.select_slider("Diámetro:", [2, 4, 8, 10, 12], value=4)
+    # AQUÍ ESTÁ EL CAMBIO: AGREGADO EL "1" AL SLIDER
+    dim = st.sidebar.select_slider("Diámetro:", [1, 2, 4, 8, 10, 12], value=4)
     datos = core.generar_presupuesto("estanque", dim)
 elif categoria == "⛺ Bóvedas":
     st.sidebar.info("Sistema Telescópico:\nMurete Tubo 90cm + Arco Varilla")
@@ -47,7 +48,6 @@ if datos:
         """, unsafe_allow_html=True)
         
     with col2:
-        # VISUALIZADOR DE CAPACIDAD Y ALTURA
         if categoria == "🐟 Estanques":
              st.metric("💧 Capacidad", f"{datos['volumen_litros']:,} Litros")
              st.metric("📏 Altura Muro", f"{datos['altura']} Metros")

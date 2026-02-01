@@ -159,36 +159,28 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         info = {'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': f"Arcos PHR C.", 'info_area': round(area_piso, 1), 'info_altura': 2.8}
         costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
-    # --- D. MUROS PERIMETRALES (CON 2 OPCIONES) ---
+    # --- D. MUROS PERIMETRALES ---
     elif tipo == "cerramiento":
-        # Desempaquetar parámetros
         largo = dimension
         altura = extra_param['h'] if extra_param else 2.0
         es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
         
         area_muro = largo * altura
         
-        # 1. ESTRUCTURA
-        # Postes PHR C cada 1.5m
+        # MODULACIÓN INTELIGENTE (1.5m para encajar en malla de 6m)
         num_postes = math.ceil(largo / 1.5) + 1
         perfiles_postes = math.ceil(num_postes / 2.0) 
         
-        # Solera Superior (Perfil U) -> SOLO SI ES REFORZADO
         perfiles_U = math.ceil(largo / 6.0) if es_reforzado else 0
         
-        # 2. MALLAS
-        # Si es Reforzado: 2 Capas Electro (Doble Membrana). Si es Económico: 1 Capa.
         factor_electro = 2.0 if es_reforzado else 1.0
         cant_electro = math.ceil((area_muro * factor_electro) / AREA_PANEL_ELECTRO)
         
-        # Zaranda siempre va por ambas caras (Sándwich visual)
         cant_zaranda = math.ceil((area_muro * 2) / AREA_ROLLO_ZARANDA)
 
-        # 3. CIMENTACIÓN Y MORTERO
         vol_dados = num_postes * (0.4 * 0.4 * 0.6) 
         cem_dados = vol_dados * 7.0; arena_dados = vol_dados * 0.6; trit_dados = vol_dados * 0.7
         
-        # Mortero: Si es doble membrana, gastamos un poquito más por el grosor del sándwich (6cm vs 5cm)
         espesor = 0.06 if es_reforzado else 0.05
         vol_mortero = area_muro * espesor
         cem_mortero = vol_mortero * 9.0; arena_mortero = vol_mortero * 1.1
@@ -204,7 +196,7 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'malla_electro': cant_electro, 
             'malla_zaranda': cant_zaranda, 
             'perfil_phr_c': perfiles_postes,
-            'perfil_phr_u': perfiles_U, # 0 si es económico
+            'perfil_phr_u': perfiles_U, 
             'pintura_asfaltica': galones_asfalto,
             'alambron': int(cem_tot * 0.2)
         }
@@ -212,7 +204,7 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         desc_tipo = "Doble Membrana + Solera Sup." if es_reforzado else "Membrana Sencilla (Económico)"
         info = {
             'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
-            'info_desc': f"Postes PHR C cada 1.5m. Altura {altura}m.",
+            'info_desc': f"Postes PHR C cada 1.5m (Módulo 6m). Altura {altura}m.",
             'info_area': area_muro, 'info_altura': altura
         }
         costo_extra = (area_muro * p['mo_m2_muro'])
@@ -256,7 +248,9 @@ st.markdown("""<style>
 # LOGIN ADMIN
 es_admin = False
 with st.sidebar:
-    st.image("https://via.placeholder.com/300x100.png?text=FERROTEK+Admin", use_container_width=True)
+    st.title("🏗️ FERROTEK")
+    st.caption("Catálogo Digital 2026")
+    
     with st.expander("🔒 Zona Administrativa"):
         if st.text_input("Contraseña:", type="password") == "ferrotek2026":
             es_admin = True
@@ -287,7 +281,6 @@ with st.sidebar:
         c_m1, c_m2 = st.columns(2)
         with c_m1: dim_sel = st.number_input("Longitud (m):", min_value=10, value=50, step=10)
         with c_m2: extra_h = st.number_input("Altura (m):", min_value=1.5, value=2.0, step=0.1)
-        # Pasamos ambos parámetros
         datos = calcular_materiales("cerramiento", dim_sel, st.session_state['db'], extra_param={'h': extra_h, 'tipo': tipo_m})
 
 # VISTAS
@@ -305,9 +298,9 @@ with tabs[0]:
             
             if categoria == CAT_MUROS:
                  if "Reforzado" in tipo_m:
-                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y altura.")
+                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos.")
                  else:
-                     st.info("⚡ **Opción Estándar:** Rápida y económica para linderos.")
+                     st.info("⚡ **Opción Estándar:** Rápida y económica.")
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -337,9 +330,9 @@ with tabs[0]:
             if categoria != CAT_ESTANQUES:
                 if categoria == CAT_MUROS:
                     if "Reforzado" in tipo_m:
-                        st.info(f"🏗️ **Sistema:** Doble Malla Electro + Solera U Superior.")
+                        st.info(f"🏗️ **Sistema:** Doble Malla Electro + Solera U.")
                     else:
-                        st.info(f"🏗️ **Sistema:** Malla Sencilla (Sin Solera Superior).")
+                        st.info(f"🏗️ **Sistema:** Malla Sencilla (Sin Solera).")
                 else:
                     st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
@@ -358,26 +351,26 @@ if es_admin:
     with tabs[2]: # MANUAL TÉCNICO
         st.header("📚 Guía de Construcción Híbrida")
         
-        with st.expander("🧱 TIPOS DE MURO (GUÍA DE VENTA Y OBRA)"):
+        with st.expander("🧱 INSTRUCCIONES DE MONTAJE (MUROS)"):
             st.markdown("""
-            **A. MURO ECONÓMICO (SENCILLO)**
-            * **Cliente:** Lotes, fincas, divisiones simples.
-            * **Estructura:** Solo postes verticales.
-            * **Malla:** 1 Electro (Centro) + 2 Zaranda.
-            * **Ventaja:** Muy barato y rápido.
-            
-            **B. MURO REFORZADO (DOBLE MEMBRANA)**
-            * **Cliente:** Fachadas, muros altos, seguridad.
-            * **Estructura:** Postes verticales + **Solera U Superior (Amarre)**.
-            * **Malla:** **2 Electros** (Doble jaula) + 2 Zaranda.
-            * **Ventaja:** Indestructible, mayor espesor (6cm), soporta portones.
+            **1. Modulación Inteligente (Ahorro de Cortes):**
+            * La malla electrosoldada viene en paneles de **6.00 metros**.
+            * Los postes (PHR C) deben instalarse exactamente a **1.50 metros** (eje a eje).
+            * **¿Por qué?** Porque $1.5 \times 4 = 6.0$. Así el panel de malla siempre termina sobre un poste.
+
+            **2. El Traslapo Perfecto:**
+            * Al modular a 6 metros, la unión entre dos mallas cae justo sobre la cara plana del Perfil C.
+            * **Acción:** Atornillar ambas mallas al mismo perfil. Esto rigidiza la unión y evita gastar alambre en empalmes aéreos.
+
+            **3. Orientación:**
+            * La Malla Zaranda (Rollos de 30m) se desenrolla horizontalmente, cubriendo todo sin cortes.
             """)
         
-        with st.expander("🏗️ INSTALACIÓN GENERAL"):
+        with st.expander("🏗️ ESPECIFICACIONES GENERALES"):
             st.markdown("""
-            **1. Cimentación (Dados):** Huecos 40x40x60cm cada 1.5m. Pintura asfáltica en puntas.
-            **2. Mortero:** 1 Cemento : 3 Arena : Cal. Espesor 5-6cm.
-            **3. Curado:** Mojar 3 veces al día por 4 días.
+            * **Fijación:** Tornillos Wafer (Cabeza Lenteja) #8.
+            * **Cimentación:** Dados 40x40x60cm.
+            * **Mortero:** 1 Cemento : 3 Arena : Cal.
             """)
 
     with tabs[3]: # CONFIG

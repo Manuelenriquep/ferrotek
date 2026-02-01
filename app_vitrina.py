@@ -1,8 +1,6 @@
-# GUARDA ESTO COMO: app_vitrina.py
-
 import streamlit as st
 import core_calculo as core
-import core_planos  # Conexión con los planos SVG
+import core_planos
 
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
 
@@ -18,6 +16,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- CORRECCIÓN AQUÍ ---
+# Se cambió 'use_column_width' por 'use_container_width'
 st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural", use_container_width=True)
 
 # --- MENÚ LATERAL ---
@@ -63,50 +63,25 @@ if datos:
     st.markdown("---")
 
     # PESTAÑAS
-    tab1, tab2, tab3 = st.tabs(["📐 Distribución y Diseño", "💰 Inversión", "🛒 Materiales"])
+    tab1, tab2, tab3 = st.tabs(["📐 Distribución", "💰 Inversión", "🛒 Materiales"])
 
-    # 1. PESTAÑA DISEÑO (LÓGICA RENDER vs PLANO)
+    # 1. PESTAÑA DISEÑO (Aquí aparecen los PLANOS)
     with tab1:
         if categoria == "🏠 Casas Modulares":
             col_text, col_plan = st.columns([1, 1.5])
             with col_text:
                 if modelo == 1: 
-                    st.markdown("""
-                    ### 🌟 "El Refugio Inteligente"
-                    **Ideal para Glamping o Solteros.**
-                    * **Fachada:** Techo a un agua y gran ventanal.
-                    * **Loft:** Cama King orientada a la vista.
-                    * **Baño Oculto:** Detrás del cabecero para máxima estética.
-                    """)
+                    st.markdown("**Concepto Loft:**\nCama central con vista, baño oculto y cocina kitchenette.")
                 elif modelo == 2: 
-                    st.markdown("""
-                    ### 🏡 "La Casa Funcional"
-                    **Ideal Familia Pequeña.**
-                    * **Privacidad:** Habitaciones separadas de la zona social.
-                    * **Acabados:** Piso microcemento industrial.
-                    """)
+                    st.markdown("**Concepto Familiar:**\nHabitaciones separadas de la zona social para privacidad.")
                 elif modelo == 3: 
-                    st.markdown("""
-                    ### 🏰 "La Hacienda Moderna"
-                    **Vivienda Definitiva.**
-                    * **Volumen:** Techo catedral a dos aguas.
-                    * **Social:** Sala-Comedor gigante.
-                    * **Master:** Suite privada.
-                    """)
+                    st.markdown("**Concepto Hacienda:**\nGran salón central (40m2) y alas independientes.")
             
             with col_plan:
-                # --- AQUÍ ESTÁ EL CAMBIO ---
-                if modelo_seleccionado == 1:
-                    # SI ES MODELO 1, MUESTRA TU RENDER
-                    try:
-                        st.image("render_modelo1.png", caption="Render 3D: Concepto Glamping", use_column_width=True)
-                    except:
-                        st.error("⚠️ Falta el archivo 'render_modelo1.png' en la carpeta.")
-                else:
-                    # SI ES MODELO 2 o 3, MUESTRA EL PLANO SVG
-                    svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
-                    st.markdown(svg_plano, unsafe_allow_html=True) 
-                    st.caption("Distribución Arquitectónica Optimizada")
+                # DIBUJO DEL PLANO SVG
+                svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
+                st.markdown(svg_plano, unsafe_allow_html=True) 
+                st.caption("Distribución Arquitectónica Optimizada")
         
         elif categoria == "🐟 Estanques":
             st.info("Diseño circular para máxima resistencia hidrostática.")

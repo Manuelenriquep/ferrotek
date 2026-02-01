@@ -7,27 +7,33 @@ import json
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="wide")
 
 # ==========================================
-# 💾 GESTIÓN DE DATOS
+# 💾 GESTIÓN DE DATOS (BASE DE DATOS)
 # ==========================================
 ARCHIVO_DB = 'ferrotek_db.json'
 
 DB_INICIAL = {
+    "config": {
+        "margen_utilidad": 0.30  # 30% por defecto (Editable en Admin)
+    },
     "precios": {
         'cemento': 28000,     'arena': 90000,       'triturado': 110000,
         'varilla': 24000,     'malla_electro': 180000, 
         'malla_zaranda': 280000, 
         
-        # REFERENCIA TÉCNICA COMPLETA (PHR C)
-        'perfil_phr_c': 65000, # Barra 6m Cal 20 (89x38mm)
+        # PERFIL ESTRUCTURAL (PHR C)
+        'perfil_phr_c': 65000, 
         
         'alambron': 8000,     'cal': 15000,
         
-        'mo_m2_casa': 250000, 
+        # MANO DE OBRA (Ajustada para bajar del millón)
+        'mo_m2_casa': 220000, 
         'mo_m2_tanque': 75000, 
         'mo_m2_boveda': 85000,
         
-        'kit_techo_m2': 120000,
-        'kit_vidrios_peq': 3500000, 'kit_vidrios_med': 5000000, 'kit_vidrios_gra': 8000000,
+        'kit_techo_m2': 110000, # Ajustado
+        'kit_vidrios_peq': 3200000, # Ajustado mercado
+        'kit_vidrios_med': 4800000, 
+        'kit_vidrios_gra': 7500000,
         'kit_impermeabilizante': 450000,
         'kit_fachada_boveda': 2500000, 
         'kit_hidraulico_estanque': 300000
@@ -46,7 +52,10 @@ def cargar_db():
             json.dump(DB_INICIAL, f)
         return DB_INICIAL
     with open(ARCHIVO_DB, 'r') as f:
-        return json.load(f)
+        # Fusión segura por si agregamos claves nuevas
+        data = json.load(f)
+        if "config" not in data: data["config"] = DB_INICIAL["config"]
+        return data
 
 def guardar_db(nueva_db):
     with open(ARCHIVO_DB, 'w') as f:
@@ -64,17 +73,16 @@ AREA_ROLLO_ZARANDA = 40.0
 def calcular_materiales(tipo, dimension, db):
     p = db['precios']
     r = db['receta_mezcla']
+    cfg = db.get('config', {'margen_utilidad': 0.30})
     
-    # Variables internas
-    lista_cantidades = {} # Para cálculo interno
-    lista_visible = {}    # Para mostrar al usuario con nombres bonitos
+    margen = cfg['margen_utilidad']
     
+    lista_cantidades = {}
+    lista_visible = {}    
     costo_extra = 0
-    margen = 0.35 
 
     # --- A. CASAS (STEEL FRAMING PHR C) ---
     if tipo == "vivienda":
-        margen = 0.35
         ALTURA_SOLERA = 2.40 
         
         if dimension == 1:
@@ -91,15 +99,14 @@ def calcular_materiales(tipo, dimension, db):
             ALTURA_SOLERA = 2.60
             kit_vidrio = p['kit_vidrios_gra']
 
-        # 1. ESTRUCTURA STEEL FRAMING (PHR C)
-        # Parales cada 50cm
+        # ESTRUCTURA PHR C
         num_parales = math.ceil(perimetro_muros / 0.50)
         perfiles_verticales = math.ceil(num_parales / 2) 
         metros_horizontales = perimetro_muros * 3 
         perfiles_horizontales = math.ceil(metros_horizontales / 6)
         total_perfiles = perfiles_verticales + perfiles_horizontales
 
-        # 2. CONCRETO
+        # CONCRETO
         vol_piso = area_piso * 0.08
         cem_piso = vol_piso * 7.5; arena_piso = vol_piso * 0.55; trit_piso = vol_piso * 0.85
         
@@ -107,7 +114,6 @@ def calcular_materiales(tipo, dimension, db):
         vol_muros = area_muros * 0.05
         cem_muro = vol_muros * 9.0; arena_muro = vol_muros * 1.1
 
-        # Construir listas
         cem_tot = int(cem_piso + cem_muro)
         lista_cantidades = {
             'cemento': cem_tot,
@@ -120,7 +126,6 @@ def calcular_materiales(tipo, dimension, db):
             'alambron': int(cem_tot * 0.3)
         }
         
-        # Datos Informativos
         info = {
             'info_nombre': nombre, 
             'info_desc': f"Estructura Galvanizada PHR C 89x38mm. Altura {ALTURA_SOLERA}m.",
@@ -131,7 +136,6 @@ def calcular_materiales(tipo, dimension, db):
 
     # --- B. ESTANQUES ---
     elif tipo == "estanque":
-        margen = 0.30
         diametro = dimension; altura = 1.2; radio = diametro / 2
         area_total = (math.pi * (radio**2)) + ((math.pi * diametro) * altura)
 
@@ -157,7 +161,6 @@ def calcular_materiales(tipo, dimension, db):
 
     # --- C. BÓVEDAS ---
     elif tipo == "boveda":
-        margen = 0.40 
         largo = dimension; ancho = 3.5
         perimetro_arco = 7.1 
         area_ferrocemento = (perimetro_arco * largo) + 14 
@@ -187,19 +190,18 @@ def calcular_materiales(tipo, dimension, db):
         }
         costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
-    # CÁLCULO FINAL Y MAPEO DE NOMBRES BONITOS
+    # CÁLCULO FINAL
     costo_mat = sum([v * p[k] for k, v in lista_cantidades.items() if k in p and isinstance(v, (int, float))])
     costo_total = costo_mat + costo_extra
     precio_venta = costo_total / (1 - margen)
     
-    # Crear diccionario legible para la UI
     nombres_legibles = {
         'cemento': 'Cemento Gris (Bultos)',
         'arena': 'Arena de Río (m³)',
         'triturado': 'Triturado 1/2 (m³)',
         'malla_electro': 'Malla Electrosoldada (Paneles)',
         'malla_zaranda': 'Malla Zaranda Fina 5x5 (Rollos)',
-        'perfil_phr_c': 'Perfil PHR C Galv 89x38 Cal 20 (6m)', # <--- REFERENCIA COMPLETA
+        'perfil_phr_c': 'Perfil PHR C Galv 89x38 Cal 20 (6m)', 
         'varillas': 'Varilla Corrugada 1/2" (6m)',
         'alambron': 'Alambrón (kg)',
         'cal': 'Cal Hidratada (Bultos)'
@@ -210,7 +212,7 @@ def calcular_materiales(tipo, dimension, db):
         lista_visible[nombre_bonito] = v
 
     return {**info, 'lista_compras_interna': lista_cantidades, 'lista_visible': lista_visible, 
-            'costo_directo': round(costo_total, -3), 'precio_venta': round(precio_venta, -3)}
+            'costo_directo': round(costo_total, -3), 'precio_venta': round(precio_venta, -3), 'margen_usado': margen}
 
 # ==========================================
 # 🎨 INTERFAZ GRÁFICA
@@ -249,7 +251,7 @@ with st.sidebar:
 
 # VISTAS
 pestanas = ["👁️ Vitrina Comercial"]
-if es_admin: pestanas += ["💰 Costos Detallados", "⚙️ Configuración"]
+if es_admin: pestanas += ["💰 Costos", "⚙️ Precios/Receta", "📈 Margen Ganancia"]
 tabs = st.tabs(pestanas)
 
 # 1. VITRINA
@@ -260,12 +262,17 @@ with tabs[0]:
             st.markdown(f'<p class="big-font">{datos.get("info_nombre")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
+            # IMAGEN
             img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
             found_img = False
             for ext in [".png", ".jpg", ".jpeg"]:
                 if os.path.exists(img_base + ext):
                     st.image(img_base + ext, use_container_width=True); found_img=True; break
-            if not found_img: st.caption(f"📷 (Imagen pendiente: {img_base})")
+            
+            # AVISO SI NO HAY FOTO
+            if not found_img: 
+                st.warning(f"⚠️ FOTO PENDIENTE: Carga '{img_base}.png' en tu carpeta para ver el render real.")
+                st.info("ℹ️ Las imágenes mostradas dependen de los archivos en tu computador. Reemplaza los archivos viejos por fotos de tus obras en metal.")
 
             if categoria != CAT_ESTANQUES:
                 st.caption("📐 Esquema de Distribución")
@@ -278,7 +285,11 @@ with tabs[0]:
             val = datos.get('info_volumen', datos.get('info_area'))
             unit = 'L' if categoria==CAT_ESTANQUES else 'm²'
             m1.metric("Área/Vol", f"{val} {unit}")
-            m2.metric("Altura", f"{datos['info_altura']} m")
+            
+            # Cálculo rápido de precio por m2 para referencia visual
+            if categoria == CAT_CASAS:
+                precio_m2 = datos["precio_venta"] / datos["info_area"]
+                st.caption(f"Valor aprox por m²: ${precio_m2:,.0f} COP")
             
             if categoria != CAT_ESTANQUES:
                 st.info(f"🏗️ **Estructura:** Perfil PHR C Galvanizado 89x38 cada 50cm.")
@@ -291,10 +302,9 @@ if es_admin:
         kpi1.metric("Costo Directo", f"${datos['costo_directo']:,.0f}")
         utilidad = datos['precio_venta'] - datos['costo_directo']
         kpi2.metric("Utilidad Bruta", f"${utilidad:,.0f}")
-        kpi3.metric("Margen", f"{int((utilidad/datos['precio_venta'])*100)}%")
+        kpi3.metric("Margen Actual", f"{int(datos['margen_usado']*100)}%")
         
         st.write("📋 **Lista de Materiales (Receta Técnica):**")
-        # Mostrar la lista bonita
         st.dataframe(datos['lista_visible'], width=500)
 
     with tabs[2]:
@@ -312,4 +322,23 @@ if es_admin:
             st.session_state['db']['receta_mezcla'] = new_receta
             guardar_db(st.session_state['db'])
             st.success("¡Guardado!")
+            st.rerun()
+
+    with tabs[3]: # NUEVA PESTAÑA PARA CONTROLAR EL MARGEN
+        st.subheader("📈 Estrategia de Precios")
+        st.write("Ajusta el margen de ganancia para controlar el precio final.")
+        
+        current_margen = st.session_state['db'].get('config', {}).get('margen_utilidad', 0.30)
+        new_margen = st.slider("Margen de Utilidad (%)", 10, 60, int(current_margen*100)) / 100.0
+        
+        c1, c2 = st.columns(2)
+        costo = datos['costo_directo']
+        precio_simulado = costo / (1 - new_margen)
+        c1.metric("Precio Simulado", f"${precio_simulado:,.0f}")
+        
+        if st.button("💾 Actualizar Margen"):
+            if "config" not in st.session_state['db']: st.session_state['db']["config"] = {}
+            st.session_state['db']["config"]["margen_utilidad"] = new_margen
+            guardar_db(st.session_state['db'])
+            st.success(f"Margen actualizado al {int(new_margen*100)}%")
             st.rerun()

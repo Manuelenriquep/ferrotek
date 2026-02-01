@@ -7,7 +7,7 @@ import json
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="wide")
 
 # ==========================================
-# 💾 GESTIÓN DE DATOS
+# 💾 GESTIÓN DE DATOS (BASE DE DATOS)
 # ==========================================
 ARCHIVO_DB = 'ferrotek_db.json'
 
@@ -20,9 +20,9 @@ DB_INICIAL = {
         'varilla': 24000,     'malla_electro': 180000, 
         'malla_zaranda': 280000, 
         
-        # ESTRUCTURA STEEL FRAMING
-        'perfil_phr_c': 65000, # El Paral (Vertical)
-        'perfil_phr_u': 55000, # La Canal (Horizontal) - Un poco más barata
+        # ESTRUCTURA STEEL FRAMING (Precios Mercado Aprox)
+        'perfil_phr_c': 65000, # Paral Estructural
+        'perfil_phr_u': 55000, # Canal/Pista Base
         
         'alambron': 8000,     'cal': 15000,
         
@@ -52,7 +52,7 @@ def cargar_db():
     with open(ARCHIVO_DB, 'r') as f:
         data = json.load(f)
         if "config" not in data: data["config"] = DB_INICIAL["config"]
-        # Asegurar que existan las claves nuevas si el archivo ya existía
+        # Asegurar claves nuevas
         if "perfil_phr_u" not in data["precios"]: data["precios"]["perfil_phr_u"] = 55000
         return data
 
@@ -79,7 +79,7 @@ def calcular_materiales(tipo, dimension, db):
     lista_visible = {}    
     costo_extra = 0
 
-    # --- A. CASAS (STEEL FRAMING C + U) ---
+    # --- A. CASAS (STEEL FRAMING HÍBRIDO) ---
     if tipo == "vivienda":
         ALTURA_SOLERA = 2.40 
         
@@ -97,22 +97,22 @@ def calcular_materiales(tipo, dimension, db):
             ALTURA_SOLERA = 2.60
             kit_vidrio = p['kit_vidrios_gra']
 
-        # 1. ESTRUCTURA
-        # A. Perfiles U (Canales): Piso y Techo (Rieles)
+        # 1. ESTRUCTURA (C + U)
+        # Perfiles U (Pistas): Piso y Techo
         metros_U = perimetro_muros * 2 
         cant_U = math.ceil(metros_U / 6.0)
 
-        # B. Perfiles C (Parales): Verticales + Dinteles/Refuerzos
+        # Perfiles C (Parales): Verticales cada 50cm
         num_parales = math.ceil(perimetro_muros / 0.50)
-        verticales_C = math.ceil(num_parales / 2) # 1 barra 6m = 2 parales
+        verticales_C = math.ceil(num_parales / 2) # 1 barra 6m = 2 parales 3m
         
-        # Refuerzos horizontales intermedios (Blocking) -> Usamos C para rigidez
+        # Blocking / Dinteles (Refuerzos horizontales con C)
         metros_blocking = perimetro_muros 
         blocking_C = math.ceil(metros_blocking / 6.0)
         
         total_C = verticales_C + blocking_C
 
-        # 2. CONCRETO
+        # 2. CONCRETO (Losa y Muros)
         vol_piso = area_piso * 0.08
         cem_piso = vol_piso * 7.5; arena_piso = vol_piso * 0.55; trit_piso = vol_piso * 0.85
         
@@ -127,15 +127,15 @@ def calcular_materiales(tipo, dimension, db):
             'triturado': round(trit_piso, 1),
             'malla_electro': math.ceil((area_muros * 1.1 + area_piso) / AREA_PANEL_ELECTRO),
             'malla_zaranda': math.ceil((area_muros * 2 * 1.1) / AREA_ROLLO_ZARANDA),
-            'perfil_phr_c': total_C,  # Verticales + Blocking
-            'perfil_phr_u': cant_U,   # Piso + Techo
-            'varillas': int(perimetro_muros),
+            'perfil_phr_c': total_C, 
+            'perfil_phr_u': cant_U,
+            'varillas': int(perimetro_muros), # Refuerzos esquineros o anclajes
             'alambron': int(cem_tot * 0.3)
         }
         
         info = {
             'info_nombre': nombre, 
-            'info_desc': f"Estructura Steel Framing (C + U). Altura {ALTURA_SOLERA}m.",
+            'info_desc': f"Sistema Híbrido: Estructura PHR Galvanizada + Piel Ferrocemento. Altura {ALTURA_SOLERA}m.",
             'info_area': area_piso, 'info_altura': ALTURA_SOLERA
         }
         costo_extra = (area_piso * p['mo_m2_casa']) + (area_piso * p['kit_techo_m2']) + kit_vidrio
@@ -160,7 +160,7 @@ def calcular_materiales(tipo, dimension, db):
         }
         info = {
             'info_nombre': f"Estanque Circular (Ø {diametro}m)", 
-            'info_desc': "Técnica Sándwich: Malla Zaranda + Electro.",
+            'info_desc': "Técnica Sándwich: Malla Zaranda + Electro. Refuerzo Varilla.",
             'info_area': round(math.pi * radio**2, 1), 'info_altura': altura, 'info_volumen': int(math.pi * radio**2 * altura * 1000)
         }
         costo_extra = (area_total * p['mo_m2_tanque']) + p['kit_hidraulico_estanque']
@@ -172,15 +172,15 @@ def calcular_materiales(tipo, dimension, db):
         area_ferrocemento = (perimetro_arco * largo) + 14 
         area_piso = ancho * largo
         
-        # Estructura: Arcos en C, Base en U
+        # Arcos estructurales (Curvados o facetados) usando Perfil C
         num_arcos = math.ceil(largo / 0.50) + 1 
         perfiles_arcos_C = math.ceil(num_arcos * 1.3) 
         
-        # Largueros: Usamos U o C? Mejor C para fuerza.
+        # Largueros de unión (Perfil C)
         metros_largueros = largo * 5
         perfiles_largueros_C = math.ceil(metros_largueros / 6)
         
-        # Rieles de piso (donde nacen los arcos) -> Perfil U
+        # Base/Riel en el piso (Perfil U)
         metros_base = largo * 2
         perfiles_base_U = math.ceil(metros_base / 6)
 
@@ -199,7 +199,7 @@ def calcular_materiales(tipo, dimension, db):
         }
         info = {
             'info_nombre': f"Bóveda Glamping ({largo}m)", 
-            'info_desc': f"Arcos PHR C + Bases PHR U.",
+            'info_desc': f"Arcos PHR C Estructurales + Bases PHR U.",
             'info_area': round(area_piso, 1), 'info_altura': 2.8
         }
         costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
@@ -209,17 +209,18 @@ def calcular_materiales(tipo, dimension, db):
     costo_total = costo_mat + costo_extra
     precio_venta = costo_total / (1 - margen)
     
+    # --- DICCIONARIO DE NOMBRES TÉCNICOS IDÓNEOS ---
     nombres_legibles = {
-        'cemento': 'Cemento Gris (Bultos)',
-        'arena': 'Arena de Río (m³)',
-        'triturado': 'Triturado 1/2 (m³)',
-        'malla_electro': 'Malla Electrosoldada (Paneles)',
-        'malla_zaranda': 'Malla Zaranda Fina 5x5 (Rollos)',
-        'perfil_phr_c': 'Perfil PHR C Galv 89x38 (6m)', 
-        'perfil_phr_u': 'Perfil PHR U (Canal) 90x40 (6m)', 
-        'varillas': 'Varilla Corrugada 1/2" (6m)',
-        'alambron': 'Alambrón (kg)',
-        'cal': 'Cal Hidratada (Bultos)'
+        'cemento': 'Cemento Gris Estructural (Bultos 50kg)',
+        'arena': 'Arena de Río Lavada (m³)',
+        'triturado': 'Triturado 1/2" (m³)',
+        'malla_electro': 'Malla Electrosoldada 4mm 15x15 (Paneles)',
+        'malla_zaranda': 'Malla Zaranda Galv. 1/2" Cal.22 (Rollos)',
+        'perfil_phr_c': 'Perfil PHR C Galv 89x40 Cal 20 (6m)',  # <--- DESCRIPCIÓN TÉCNICA
+        'perfil_phr_u': 'Perfil PHR U (Pista) 90x40 Cal 22 (6m)', # <--- DESCRIPCIÓN TÉCNICA
+        'varillas': 'Varilla Corrugada 1/2" N-40 (6m)',
+        'alambron': 'Alambrón Negro (kg)',
+        'cal': 'Cal Hidratada (Bultos 25kg)'
     }
     
     for k, v in lista_cantidades.items():
@@ -284,7 +285,7 @@ with tabs[0]:
                     st.image(img_base + ext, use_container_width=True); found_img=True; break
             
             if not found_img: 
-                st.warning(f"⚠️ FOTO PENDIENTE: Carga '{img_base}.png' en tu carpeta.")
+                st.warning(f"⚠️ FOTO PENDIENTE: Carga '{img_base}.png'")
 
             if categoria != CAT_ESTANQUES:
                 st.caption("📐 Esquema de Distribución")
@@ -303,7 +304,7 @@ with tabs[0]:
                 st.caption(f"Valor aprox por m²: ${precio_m2:,.0f} COP")
             
             if categoria != CAT_ESTANQUES:
-                st.info(f"🏗️ **Estructura:** Steel Framing Completo (C + U).")
+                st.info(f"🏗️ **Estructura:** Perfil PHR C + U Galvanizado (Sistema Híbrido).")
 
 # 2. ADMIN
 if es_admin:
@@ -315,8 +316,8 @@ if es_admin:
         kpi2.metric("Utilidad Bruta", f"${utilidad:,.0f}")
         kpi3.metric("Margen Actual", f"{int(datos['margen_usado']*100)}%")
         
-        st.write("📋 **Lista de Materiales (Receta Técnica):**")
-        st.dataframe(datos['lista_visible'], width=500)
+        st.write("📋 **Lista de Materiales (Especificaciones Técnicas):**")
+        st.dataframe(datos['lista_visible'], width=600) # Un poco más ancho para que quepan los nombres
 
     with tabs[2]:
         st.subheader("⚙️ Configuración")
@@ -337,8 +338,6 @@ if es_admin:
 
     with tabs[3]:
         st.subheader("📈 Estrategia de Precios")
-        st.write("Ajusta el margen de ganancia para controlar el precio final.")
-        
         current_margen = st.session_state['db'].get('config', {}).get('margen_utilidad', 0.30)
         new_margen = st.slider("Margen de Utilidad (%)", 10, 60, int(current_margen*100)) / 100.0
         
@@ -351,5 +350,5 @@ if es_admin:
             if "config" not in st.session_state['db']: st.session_state['db']["config"] = {}
             st.session_state['db']["config"]["margen_utilidad"] = new_margen
             guardar_db(st.session_state['db'])
-            st.success(f"Margen actualizado al {int(new_margen*100)}%")
+            st.success("Margen actualizado")
             st.rerun()

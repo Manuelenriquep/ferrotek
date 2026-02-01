@@ -18,12 +18,15 @@ DB_INICIAL = {
     "precios": {
         'cemento': 28000,     'arena': 90000,       'triturado': 110000,
         'varilla': 24000,     
-        'malla_electro': 210000, # Precio Malla 5mm
+        'malla_electro': 210000, 
         'malla_zaranda': 280000, 
         
         'perfil_phr_c': 65000, 
         'perfil_phr_u': 55000, 
         'pintura_asfaltica': 45000, 
+        'esmalte_negro': 70000,
+        'vinilo_madera_m2': 55000, # <--- NUEVO: Precio m2 Vinilo PVC
+        'pegante_boxer': 60000,    # <--- NUEVO: Galón de Boxer
         
         'alambron': 8000,     'cal': 15000,
         
@@ -54,7 +57,11 @@ def cargar_db():
     with open(ARCHIVO_DB, 'r') as f:
         data = json.load(f)
         if "config" not in data: data["config"] = DB_INICIAL["config"]
-        if "pintura_asfaltica" not in data["precios"]: data["precios"]["pintura_asfaltica"] = 45000
+        # Actualización de precios nuevos si no existen
+        if "vinilo_madera_m2" not in data["precios"]: data["precios"]["vinilo_madera_m2"] = 55000
+        if "pegante_boxer" not in data["precios"]: data["precios"]["pegante_boxer"] = 60000
+        if "esmalte_negro" not in data["precios"]: data["precios"]["esmalte_negro"] = 70000
+        
         if data["precios"].get("mo_m2_muro") == 65000: data["precios"]["mo_m2_muro"] = 45000
         if data["precios"].get("malla_electro") == 180000: data["precios"]["malla_electro"] = 210000
         return data
@@ -80,26 +87,23 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
     
     lista_cantidades = {}
     lista_visible = {}    
-    costo_mo_total = 0 # Variable específica para MO
-    costo_otros = 0    # Kits, vidrios, etc.
-    dias_obra = 0      # Nuevo cálculo de tiempo
+    costo_mo_total = 0
+    costo_otros = 0
+    dias_obra = 0
     info = {}
 
     # --- A. CASAS ---
     if tipo == "vivienda":
+        # Extraer parámetros de acabado
+        es_madera = (extra_param == "Tipo Cabaña (Perfiles Madera)") if extra_param else False
+        
         ALTURA_SOLERA = 2.40 
         if dimension == 1:
-            nombre = "Modelo 1: Loft (35m²)"
-            area_piso = 35; perimetro_muros = 24; kit_vidrio = p['kit_vidrios_peq']
-            dias_obra = 20 # Estimado base
+            nombre = "Modelo 1: Loft (35m²)"; area_piso = 35; perimetro_muros = 24; kit_vidrio = p['kit_vidrios_peq']; dias_obra = 20
         elif dimension == 2:
-            nombre = "Modelo 2: Familiar (65m²)"
-            area_piso = 65; perimetro_muros = 36; kit_vidrio = p['kit_vidrios_med']
-            dias_obra = 35
+            nombre = "Modelo 2: Familiar (65m²)"; area_piso = 65; perimetro_muros = 36; kit_vidrio = p['kit_vidrios_med']; dias_obra = 35
         elif dimension == 3:
-            nombre = "Modelo 3: Hacienda (110m²)"
-            area_piso = 110; perimetro_muros = 55; ALTURA_SOLERA = 2.60; kit_vidrio = p['kit_vidrios_gra']
-            dias_obra = 50
+            nombre = "Modelo 3: Hacienda (110m²)"; area_piso = 110; perimetro_muros = 55; ALTURA_SOLERA = 2.60; kit_vidrio = p['kit_vidrios_gra']; dias_obra = 50
 
         metros_U = perimetro_muros * 2; cant_U = math.ceil(metros_U / 6.0)
         num_parales = math.ceil(perimetro_muros / 0.50); verticales_C = math.ceil(num_parales / 2)
@@ -114,6 +118,21 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         cem_tot = int(cem_piso + cem_muro)
         
         galones_asfalto = math.ceil(perimetro_muros / 15.0)
+        
+        # LÓGICA DE ACABADO ESTRUCTURAL
+        galones_esmalte = 0
+        m2_vinilo = 0
+        galones_boxer = 0
+        
+        if es_madera:
+            # 1 m2 de vinilo cubre aprox 11 ml de perfil (ancho 9cm). 
+            # Total metros lineales de estructura visible (aprox 70% de verticales)
+            metros_lineales_visibles = total_C * 6.0 * 0.7 
+            m2_vinilo = math.ceil(metros_lineales_visibles * 0.09 * 1.1) # 10% desperdicio
+            galones_boxer = math.ceil(m2_vinilo / 15.0) # 1 galon rinde 15m2 pegado
+        else:
+            # Pintura Negra
+            galones_esmalte = math.ceil(total_C / 15.0)
 
         lista_cantidades = {
             'cemento': cem_tot, 'arena': round(arena_piso + arena_muro, 1), 'triturado': round(trit_piso, 1),
@@ -121,11 +140,14 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'malla_zaranda': math.ceil((area_muros * 2 * 1.1) / AREA_ROLLO_ZARANDA),
             'perfil_phr_c': total_C, 'perfil_phr_u': cant_U,
             'pintura_asfaltica': galones_asfalto,
+            'esmalte_negro': galones_esmalte,
+            'vinilo_madera_m2': m2_vinilo,  # <--- NUEVO
+            'pegante_boxer': galones_boxer, # <--- NUEVO
             'varillas': int(perimetro_muros), 'alambron': int(cem_tot * 0.3)
         }
-        info = {'info_nombre': nombre, 'info_desc': f"Estructura Steel-Ferro Híbrida.", 'info_area': area_piso, 'info_altura': ALTURA_SOLERA}
         
-        # Desglose Costos
+        estilo = "Acabado Cabaña (Estructura Tipo Madera)" if es_madera else "Acabado Industrial (Estructura Negra)"
+        info = {'info_nombre': nombre, 'info_desc': estilo, 'info_area': area_piso, 'info_altura': ALTURA_SOLERA}
         costo_mo_total = area_piso * p['mo_m2_casa']
         costo_otros = (area_piso * p['kit_techo_m2']) + kit_vidrio
 
@@ -134,7 +156,7 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         diametro = dimension; altura = 1.2; radio = diametro / 2
         area_total = (math.pi * (radio**2)) + ((math.pi * diametro) * altura)
         vol_tot = area_total * 0.06; cem = int(vol_tot * 8.5); cem = 4 if cem < 4 else cem
-        dias_obra = math.ceil(area_total / 5.0) # Rendimiento aprox
+        dias_obra = math.ceil(area_total / 5.0)
         
         lista_cantidades = {
             'cemento': cem, 'cal': int(cem * r['muro_cal_factor']), 'arena': round(vol_tot * 1.0, 1),
@@ -143,7 +165,6 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'varillas': int((math.pi * diametro * 7) / 6), 'alambron': int(cem * 0.4)
         }
         info = {'info_nombre': f"Estanque Circular (Ø {diametro}m)", 'info_desc': "Técnica Sándwich.", 'info_area': round(math.pi * radio**2, 1), 'info_altura': altura, 'info_volumen': int(math.pi * radio**2 * altura * 1000)}
-        
         costo_mo_total = area_total * p['mo_m2_tanque']
         costo_otros = p['kit_hidraulico_estanque']
 
@@ -156,7 +177,6 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         num_arcos = math.ceil(largo / 0.50) + 1; perfiles_arcos_C = math.ceil(num_arcos * 1.3)
         metros_largueros = largo * 5; perfiles_largueros_C = math.ceil(metros_largueros / 6)
         metros_base = largo * 2; perfiles_base_U = math.ceil(metros_base / 6)
-
         vol_tot = (area_piso * 0.07) + (area_ferrocemento * 0.035)
         cem = int(vol_tot * 8.5)
         galones_asfalto = math.ceil(metros_base / 15.0)
@@ -170,7 +190,6 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'alambron': int(cem * 0.3)
         }
         info = {'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': f"Arcos PHR C.", 'info_area': round(area_piso, 1), 'info_altura': 2.8}
-        
         costo_mo_total = area_ferrocemento * p['mo_m2_boveda']
         costo_otros = p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
@@ -181,32 +200,28 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
         distancia_postes = extra_param.get('distancia', 2.0)
         
-        # CÁLCULO DE TIEMPO (Rendimiento Cuadrilla)
-        rendimiento_diario = 6.0 if es_reforzado else 10.0 # ml/día
+        rendimiento_diario = 6.0 if es_reforzado else 10.0
         dias_obra = math.ceil(largo / rendimiento_diario)
-        
         area_muro = largo * altura
         
         num_postes = math.ceil(largo / distancia_postes) + 1
         postes_por_barra = 2.0 if altura <= 2.30 else 1.0
         perfiles_postes = math.ceil(num_postes / postes_por_barra) 
-        
         perfiles_U = math.ceil(largo / 6.0) if es_reforzado else 0
         
         factor_electro = 2.0 if es_reforzado else 1.0
         cant_electro = math.ceil((area_muro * factor_electro) / AREA_PANEL_ELECTRO)
-        
         cant_zaranda = math.ceil((area_muro * 2) / AREA_ROLLO_ZARANDA)
 
         vol_dados = num_postes * (0.4 * 0.4 * 0.6) 
         cem_dados = vol_dados * 7.0; arena_dados = vol_dados * 0.6; trit_dados = vol_dados * 0.7
-        
         espesor = 0.06 if es_reforzado else 0.05
         vol_mortero = area_muro * espesor
         cem_mortero = vol_mortero * 9.0; arena_mortero = vol_mortero * 1.1
         cem_tot = int(cem_dados + cem_mortero)
         
         galones_asfalto = math.ceil(num_postes / 25.0) 
+        galones_esmalte = math.ceil(num_postes / 15.0) 
 
         lista_cantidades = {
             'cemento': cem_tot,
@@ -218,16 +233,16 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'perfil_phr_c': perfiles_postes,
             'perfil_phr_u': perfiles_U, 
             'pintura_asfaltica': galones_asfalto,
+            'esmalte_negro': galones_esmalte,
             'alambron': int(cem_tot * 0.2)
         }
         
         desc_tipo = "Doble Membrana" if es_reforzado else "Sencillo (1 Malla)"
         info = {
             'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
-            'info_desc': f"Solución Híbrida. Altura {altura}m. Postes a {distancia_postes}m.",
+            'info_desc': f"Acabado Industrial (Negro Mate + Crema Natural).",
             'info_area': area_muro, 'info_altura': altura
         }
-        
         costo_mo_total = area_muro * p['mo_m2_muro']
         costo_otros = 0
 
@@ -244,7 +259,10 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         'malla_zaranda': 'Malla Zaranda Fina 5x5 (Rollos)',
         'perfil_phr_c': 'Perfil PHR C Galv 89x38 (6m)', 
         'perfil_phr_u': 'Perfil PHR U (Pista) 90x40 (6m)', 
-        'pintura_asfaltica': 'Pintura Asfáltica (Galones)',
+        'pintura_asfaltica': 'Pintura Asfáltica (Cimentación)',
+        'esmalte_negro': 'Esmalte Negro Mate (Acabado)',
+        'vinilo_madera_m2': 'Vinilo PVC Tipo Madera (m²)', # <---
+        'pegante_boxer': 'Pegante Boxer (Galones)',        # <---
         'varillas': 'Varilla Corrugada 1/2" (6m)',
         'alambron': 'Alambrón (kg)',
         'cal': 'Cal Hidratada (Bultos)'
@@ -296,11 +314,14 @@ with st.sidebar:
     
     categoria = st.radio("Línea de Negocio:", [CAT_CASAS, CAT_ESTANQUES, CAT_BOVEDAS, CAT_MUROS])
 
-    datos = None; mod_sel=0; dim_sel=0; extra_h=2.20; tipo_m="Económico"; dist_p=2.0
+    datos = None; mod_sel=0; dim_sel=0; extra_h=2.20; tipo_m="Económico"; dist_p=2.0; acab_casas="Industrial"
     
     if categoria == CAT_CASAS:
         mod_sel = st.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
-        datos = calcular_materiales("vivienda", mod_sel, st.session_state['db'])
+        # SELECTOR DE ACABADO PARA CASAS
+        acab_casas = st.radio("Estilo de Estructura:", ["Tipo Industrial (Pintura Negra)", "Tipo Cabaña (Perfiles Madera)"])
+        datos = calcular_materiales("vivienda", mod_sel, st.session_state['db'], extra_param=acab_casas)
+        
     elif categoria == CAT_ESTANQUES:
         dim_sel = st.select_slider("Diámetro (m):", [1, 2, 4, 8, 10, 12], value=8)
         datos = calcular_materiales("estanque", dim_sel, st.session_state['db'])
@@ -336,11 +357,14 @@ with tabs[0]:
             st.markdown(f'<p class="big-font">{datos.get("info_nombre")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
+            if categoria == CAT_CASAS:
+                if "Madera" in acab_casas:
+                    st.success("🪵 **Estilo Cabaña:** Estructura con enchape vinílico tipo madera.")
+                else:
+                    st.info("🎨 **Estilo Industrial:** Estructura en negro mate de alto contraste.")
+            
             if categoria == CAT_MUROS:
-                 if "Reforzado" in tipo_m:
-                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y seguridad.")
-                 else:
-                     st.info("✅ **Opción Estándar:** Solución eficiente, rápida y garantizada.")
+                 st.info("🎨 **Acabado:** Muro Natural (Arena/Cal) + Estructura Negra Mate.")
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -371,12 +395,68 @@ with tabs[0]:
                 m2.metric("Altura", f"{datos['info_altura']} m")
             
             if categoria != CAT_ESTANQUES:
-                if categoria == CAT_MUROS:
-                    st.info(f"🏗️ **Sistema:** Postes Galvanizados + Malla Estructural 5mm.")
-                else:
-                    st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
+                st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
 # 2. ADMIN
 if es_admin:
     with tabs[1]: # COSTOS NUEVO
-        st
+        st.subheader("📊 Desglose Financiero del Proyecto")
+        
+        c_mat, c_mo, c_tot = st.columns(3)
+        c_mat.markdown(f"<div class='metric-card'><h4>🧱 Materiales</h4><h2>${datos['costo_materiales']:,.0f}</h2></div>", unsafe_allow_html=True)
+        c_mo.markdown(f"<div class='metric-card'><h4>👷‍♂️ Mano de Obra</h4><h2>${datos['costo_mano_obra']:,.0f}</h2><p>Estimado {datos['dias_estimados']} días</p></div>", unsafe_allow_html=True)
+        c_tot.markdown(f"<div class='metric-card'><h4>💰 Costo Directo Total</h4><h2>${datos['costo_total']:,.0f}</h2></div>", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        kpi1, kpi2 = st.columns(2)
+        utilidad = datos['precio_venta'] - datos['costo_total']
+        kpi1.metric("💵 Utilidad Bruta", f"${utilidad:,.0f}")
+        kpi2.metric("📈 Margen Real", f"{int(datos['margen_usado']*100)}%")
+        
+        st.write("📋 **Lista de Compras (Incluye Acabados):**")
+        st.dataframe(datos['lista_visible'], width=600)
+
+    with tabs[2]: # MANUAL TÉCNICO
+        st.header("📚 Guía de Construcción Híbrida")
+        
+        with st.expander("🪵 ACABADO TIPO MADERA (CASAS)"):
+            st.markdown("""
+            **MATERIALES**
+            * **Vinilo PVC:** Piso flexible 2mm o 3mm (No Click).
+            * **Pegante:** Boxer (Solución de caucho). NO usar el adhesivo del vinilo.
+
+            **INSTALACIÓN**
+            1. Limpiar el perfil con varsol.
+            2. Aplicar Boxer en el perfil y en la tira de vinilo.
+            3. Dejar secar 10-15 min (al tacto).
+            4. Pegar y martillar con mazo de goma.
+            """)
+            
+        with st.expander("🧱 OPTIMIZACIÓN DE MUROS"):
+            st.markdown("""
+            * **Postes:** Cada 2.00 metros.
+            * **Malla:** 5mm (Panel 6m).
+            """)
+
+    with tabs[3]: # CONFIG
+        col_p, col_r = st.columns(2)
+        with col_p:
+            st.write("**Precios:**")
+            new_prices = st.data_editor(st.session_state['db']['precios'], height=400)
+        with col_r:
+            st.write("**Receta:**")
+            new_receta = st.data_editor(st.session_state['db']['receta_mezcla'])
+        if st.button("💾 Guardar DB"):
+            st.session_state['db']['precios'] = new_prices; st.session_state['db']['receta_mezcla'] = new_receta
+            guardar_db(st.session_state['db']); st.success("Guardado!"); st.rerun()
+
+    with tabs[4]: # MARGEN
+        curr = st.session_state['db'].get('config', {}).get('margen_utilidad', 0.30)
+        new_m = st.slider("Margen %", 10, 60, int(curr*100)) / 100.0
+        c1, c2 = st.columns(2)
+        c1.metric("Precio Simulado", f"${datos['costo_total']/(1-new_m):,.0f}")
+        if st.button("Actualizar Margen"):
+            if "config" not in st.session_state['db']: st.session_state['db']["config"] = {}
+            st.session_state['db']["config"]["margen_utilidad"] = new_m
+            guardar_db(st.session_state['db']); st.rerun()

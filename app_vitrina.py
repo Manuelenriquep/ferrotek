@@ -80,7 +80,9 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
     
     lista_cantidades = {}
     lista_visible = {}    
-    costo_extra = 0
+    costo_mo_total = 0 # Variable específica para MO
+    costo_otros = 0    # Kits, vidrios, etc.
+    dias_obra = 0      # Nuevo cálculo de tiempo
     info = {}
 
     # --- A. CASAS ---
@@ -89,12 +91,15 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         if dimension == 1:
             nombre = "Modelo 1: Loft (35m²)"
             area_piso = 35; perimetro_muros = 24; kit_vidrio = p['kit_vidrios_peq']
+            dias_obra = 20 # Estimado base
         elif dimension == 2:
             nombre = "Modelo 2: Familiar (65m²)"
             area_piso = 65; perimetro_muros = 36; kit_vidrio = p['kit_vidrios_med']
+            dias_obra = 35
         elif dimension == 3:
             nombre = "Modelo 3: Hacienda (110m²)"
             area_piso = 110; perimetro_muros = 55; ALTURA_SOLERA = 2.60; kit_vidrio = p['kit_vidrios_gra']
+            dias_obra = 50
 
         metros_U = perimetro_muros * 2; cant_U = math.ceil(metros_U / 6.0)
         num_parales = math.ceil(perimetro_muros / 0.50); verticales_C = math.ceil(num_parales / 2)
@@ -119,13 +124,17 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'varillas': int(perimetro_muros), 'alambron': int(cem_tot * 0.3)
         }
         info = {'info_nombre': nombre, 'info_desc': f"Estructura Steel-Ferro Híbrida.", 'info_area': area_piso, 'info_altura': ALTURA_SOLERA}
-        costo_extra = (area_piso * p['mo_m2_casa']) + (area_piso * p['kit_techo_m2']) + kit_vidrio
+        
+        # Desglose Costos
+        costo_mo_total = area_piso * p['mo_m2_casa']
+        costo_otros = (area_piso * p['kit_techo_m2']) + kit_vidrio
 
     # --- B. ESTANQUES ---
     elif tipo == "estanque":
         diametro = dimension; altura = 1.2; radio = diametro / 2
         area_total = (math.pi * (radio**2)) + ((math.pi * diametro) * altura)
         vol_tot = area_total * 0.06; cem = int(vol_tot * 8.5); cem = 4 if cem < 4 else cem
+        dias_obra = math.ceil(area_total / 5.0) # Rendimiento aprox
         
         lista_cantidades = {
             'cemento': cem, 'cal': int(cem * r['muro_cal_factor']), 'arena': round(vol_tot * 1.0, 1),
@@ -134,12 +143,15 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'varillas': int((math.pi * diametro * 7) / 6), 'alambron': int(cem * 0.4)
         }
         info = {'info_nombre': f"Estanque Circular (Ø {diametro}m)", 'info_desc': "Técnica Sándwich.", 'info_area': round(math.pi * radio**2, 1), 'info_altura': altura, 'info_volumen': int(math.pi * radio**2 * altura * 1000)}
-        costo_extra = (area_total * p['mo_m2_tanque']) + p['kit_hidraulico_estanque']
+        
+        costo_mo_total = area_total * p['mo_m2_tanque']
+        costo_otros = p['kit_hidraulico_estanque']
 
     # --- C. BÓVEDAS ---
     elif tipo == "boveda":
         largo = dimension; ancho = 3.5; perimetro_arco = 7.1 
         area_ferrocemento = (perimetro_arco * largo) + 14; area_piso = ancho * largo
+        dias_obra = math.ceil(largo * 1.5)
         
         num_arcos = math.ceil(largo / 0.50) + 1; perfiles_arcos_C = math.ceil(num_arcos * 1.3)
         metros_largueros = largo * 5; perfiles_largueros_C = math.ceil(metros_largueros / 6)
@@ -147,7 +159,6 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
 
         vol_tot = (area_piso * 0.07) + (area_ferrocemento * 0.035)
         cem = int(vol_tot * 8.5)
-        
         galones_asfalto = math.ceil(metros_base / 15.0)
 
         lista_cantidades = {
@@ -159,7 +170,9 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'alambron': int(cem * 0.3)
         }
         info = {'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': f"Arcos PHR C.", 'info_area': round(area_piso, 1), 'info_altura': 2.8}
-        costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
+        
+        costo_mo_total = area_ferrocemento * p['mo_m2_boveda']
+        costo_otros = p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
     # --- D. MUROS PERIMETRALES ---
     elif tipo == "cerramiento":
@@ -168,12 +181,13 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
         distancia_postes = extra_param.get('distancia', 2.0)
         
+        # CÁLCULO DE TIEMPO (Rendimiento Cuadrilla)
+        rendimiento_diario = 6.0 if es_reforzado else 10.0 # ml/día
+        dias_obra = math.ceil(largo / rendimiento_diario)
+        
         area_muro = largo * altura
         
-        # CÁLCULO DE POSTES
         num_postes = math.ceil(largo / distancia_postes) + 1
-        
-        # Aprovechamiento: 1 barra 6m = 2 postes de 3m (2.20 libre + 0.80 enterrado)
         postes_por_barra = 2.0 if altura <= 2.30 else 1.0
         perfiles_postes = math.ceil(num_postes / postes_por_barra) 
         
@@ -210,14 +224,16 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         desc_tipo = "Doble Membrana" if es_reforzado else "Sencillo (1 Malla)"
         info = {
             'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
-            'info_desc': f"Solución Híbrida Steel-Ferro. Altura {altura}m.",
+            'info_desc': f"Solución Híbrida. Altura {altura}m. Postes a {distancia_postes}m.",
             'info_area': area_muro, 'info_altura': altura
         }
-        costo_extra = (area_muro * p['mo_m2_muro'])
+        
+        costo_mo_total = area_muro * p['mo_m2_muro']
+        costo_otros = 0
 
     # CÁLCULO FINAL
     costo_mat = sum([v * p[k] for k, v in lista_cantidades.items() if k in p and isinstance(v, (int, float))])
-    costo_total = costo_mat + costo_extra
+    costo_total = costo_mat + costo_mo_total + costo_otros
     precio_venta = costo_total / (1 - margen)
     
     nombres_legibles = {
@@ -238,8 +254,16 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         nombre_bonito = nombres_legibles.get(k, k)
         lista_visible[nombre_bonito] = v
 
-    return {**info, 'lista_compras_interna': lista_cantidades, 'lista_visible': lista_visible, 
-            'costo_directo': round(costo_total, -3), 'precio_venta': round(precio_venta, -3), 'margen_usado': margen}
+    return {**info, 
+            'lista_compras_interna': lista_cantidades, 
+            'lista_visible': lista_visible, 
+            'costo_materiales': round(costo_mat, -3),
+            'costo_mano_obra': round(costo_mo_total, -3),
+            'costo_otros': round(costo_otros, -3),
+            'costo_total': round(costo_total, -3), 
+            'precio_venta': round(precio_venta, -3), 
+            'margen_usado': margen,
+            'dias_estimados': dias_obra}
 
 # ==========================================
 # 🎨 INTERFAZ GRÁFICA
@@ -249,6 +273,7 @@ st.markdown("""<style>
     .sub-font { font-size:18px !important; color: #555; font-style: italic;}
     .price-tag { font-size:42px; color: #27AE60; font-weight: bold; background-color: #eafaf1; padding: 10px; border-radius: 8px; text-align: center;}
     .card { background-color: #ffffff; padding: 25px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #2980B9;}
+    .metric-card { background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px; border-radius: 5px; text-align:center;}
 </style>""", unsafe_allow_html=True)
 
 # LOGIN ADMIN
@@ -286,12 +311,11 @@ with st.sidebar:
         col_tipo, col_dist = st.columns(2)
         with col_tipo:
             tipo_m = st.radio("Estructura:", ["Sencillo (1 Malla)", "Reforzado (2 Mallas)"])
-        # Solo el admin ve la opción de cambiar la distancia de postes. Para el cliente es transparente.
         if es_admin:
             with col_dist:
                 dist_p = st.radio("Separación Postes (Admin):", [1.5, 2.0, 3.0], index=1, format_func=lambda x: f"{x} m")
         else:
-             dist_p = 2.0 # Default fijo para cliente
+             dist_p = 2.0
 
         c_m1, c_m2 = st.columns(2)
         with c_m1: dim_sel = st.number_input("Longitud (m):", min_value=10, value=50, step=10)
@@ -301,7 +325,7 @@ with st.sidebar:
 
 # VISTAS
 pestanas = ["👁️ Vitrina Comercial"]
-if es_admin: pestanas += ["💰 Costos", "📚 Guía Técnica", "⚙️ Configuración", "📈 Margen"]
+if es_admin: pestanas += ["💰 Costos & Nómina", "📚 Guía Técnica", "⚙️ Configuración", "📈 Margen"]
 tabs = st.tabs(pestanas)
 
 # 1. VITRINA
@@ -312,14 +336,11 @@ with tabs[0]:
             st.markdown(f'<p class="big-font">{datos.get("info_nombre")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
-            # --- AQUÍ ESTÁ EL CAMBIO EN LA VITRINA ---
             if categoria == CAT_MUROS:
                  if "Reforzado" in tipo_m:
                      st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y seguridad.")
                  else:
                      st.info("✅ **Opción Estándar:** Solución eficiente, rápida y garantizada.")
-            # ----------------------------------------
-            
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -339,6 +360,7 @@ with tabs[0]:
                  st.metric("Metros Lineales", f"{dim_sel} ml")
                  precio_ml = datos["precio_venta"] / dim_sel
                  st.caption(f"Costo por ML: ${precio_ml:,.0f}")
+                 st.caption(f"⏱️ Tiempo Estimado: {datos['dias_estimados']} días aprox.")
                  if extra_h == 2.0:
                      st.info("💡 **Tip:** Puedes pedir este muro a **2.20m** por el mismo precio.")
             else:
@@ -350,59 +372,11 @@ with tabs[0]:
             
             if categoria != CAT_ESTANQUES:
                 if categoria == CAT_MUROS:
-                    # Mensaje comercial limpio
                     st.info(f"🏗️ **Sistema:** Postes Galvanizados + Malla Estructural 5mm.")
                 else:
                     st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
 # 2. ADMIN
 if es_admin:
-    with tabs[1]: # COSTOS
-        st.subheader("📊 Estructura de Costos")
-        kpi1, kpi2, kpi3 = st.columns(3)
-        kpi1.metric("Costo Directo", f"${datos['costo_directo']:,.0f}")
-        utilidad = datos['precio_venta'] - datos['costo_directo']
-        kpi2.metric("Utilidad Bruta", f"${utilidad:,.0f}")
-        kpi3.metric("Margen", f"{int(datos['margen_usado']*100)}%")
-        st.write("📋 **Lista de Materiales:**")
-        st.dataframe(datos['lista_visible'], width=600)
-
-    with tabs[2]: # MANUAL TÉCNICO
-        st.header("📚 Guía de Construcción Híbrida")
-        
-        with st.expander("🧱 OPTIMIZACIÓN DE MUROS (SOLO INTERNO)"):
-            st.markdown("""
-            **CONFIGURACIÓN "A LA FIJA" (Rentabilidad Máxima)**
-            * **Postes:** Cada **2.00 metros**.
-            * **Malla:** Electrosoldada **5mm** (Panel 6.00m).
-            * **Razón:** 1 Panel de Malla = 3 Espacios exactos de 2m. Cero desperdicio.
-            * **Nota:** No compartir este detalle con el cliente, vender como "Sistema Modular".
-            """)
-            
-        with st.expander("✂️ CORTES DE PERFIL"):
-            st.markdown("""
-            * **Altura 2.20m:** Barra de 6m partida a la mitad (3m).
-            * **Instalación:** 80cm de cimentación + 2.20m de luz libre.
-            """)
-
-    with tabs[3]: # CONFIG
-        col_p, col_r = st.columns(2)
-        with col_p:
-            st.write("**Precios:**")
-            new_prices = st.data_editor(st.session_state['db']['precios'], height=400)
-        with col_r:
-            st.write("**Receta:**")
-            new_receta = st.data_editor(st.session_state['db']['receta_mezcla'])
-        if st.button("💾 Guardar DB"):
-            st.session_state['db']['precios'] = new_prices; st.session_state['db']['receta_mezcla'] = new_receta
-            guardar_db(st.session_state['db']); st.success("Guardado!"); st.rerun()
-
-    with tabs[4]: # MARGEN
-        curr = st.session_state['db'].get('config', {}).get('margen_utilidad', 0.30)
-        new_m = st.slider("Margen %", 10, 60, int(curr*100)) / 100.0
-        c1, c2 = st.columns(2)
-        c1.metric("Precio Simulado", f"${datos['costo_directo']/(1-new_m):,.0f}")
-        if st.button("Actualizar Margen"):
-            if "config" not in st.session_state['db']: st.session_state['db']["config"] = {}
-            st.session_state['db']["config"]["margen_utilidad"] = new_m
-            guardar_db(st.session_state['db']); st.rerun()
+    with tabs[1]: # COSTOS NUEVO
+        st

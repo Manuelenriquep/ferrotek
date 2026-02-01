@@ -52,15 +52,28 @@ if datos:
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
 
-    # Métricas Superiores (Aquí también se ve el área)
+    # --- MÉTRICAS CON TIEMPOS DE ENTREGA (NUEVO) ---
     c1, c2, c3 = st.columns(3)
+    
+    # 1. Definir tiempos estimados (Ajustables)
+    tiempo_entrega = "Consultar"
+    if categoria == "🏠 Casas Modulares":
+         tiempo_entrega = "30 - 45 Días"
+    elif categoria == "🐟 Estanques":
+         tiempo_entrega = "10 - 15 Días"
+    elif categoria == "⛺ Bóvedas":
+         tiempo_entrega = "5 - 7 Días"
+
+    # 2. Mostrar métricas
     if categoria == "🐟 Estanques":
         c1.metric("💧 Capacidad", f"{datos['volumen_litros']:,} L")
         c2.metric("📏 Altura Muro", "1.20 m")
     else:
         c1.metric("📏 Área Total", f"{datos['area']} m²")
         c2.metric("🏠 Altura", f"{datos['altura']} m")
-    c3.metric("🔨 Tiempo Est.", "Entrega Rápida")
+    
+    # 3. Métrica de Tiempo
+    c3.metric("🗓️ Tiempo Aprox.", tiempo_entrega)
     
     st.markdown("---")
 
@@ -72,10 +85,9 @@ if datos:
         if categoria == "🏠 Casas Modulares":
             col_text, col_visual = st.columns([1, 1.5])
             
-            # Columna de Texto (Izquierda) - ÁREAS RESALTADAS AQUÍ
+            # Columna de Texto (Izquierda) - ÁREAS RESALTADAS
             with col_text:
                 if modelo == 1: 
-                    # Usamos HTML para resaltar el área en el título
                     st.markdown(f"### 🌟 Concepto Loft | <span class='highlight'>{datos['area']} m²</span>", unsafe_allow_html=True)
                     st.write("Diseñado para maximizar la vista. La cama King Size 'flota' en el centro, mirando al paisaje, mientras que el baño y vestier quedan ocultos tras un muro cabecero funcional.")
                 elif modelo == 2: 
@@ -85,17 +97,23 @@ if datos:
                     st.markdown(f"### 🏰 Concepto Hacienda | <span class='highlight'>{datos['area']} m²</span>", unsafe_allow_html=True)
                     st.write("Majestuosidad rural. Un gran salón central de techo alto conecta dos alas independientes: una privada para los dueños y otra para huéspedes o hijos.")
             
-            # Columna Visual (Derecha) - RENDERS Y PLANOS
+            # Columna Visual (Derecha) - RENDERS INTELIGENTES Y PLANOS
             with col_visual:
-                # A. RENDER 3D (Según el modelo)
-                render_file = f"render_modelo{modelo_seleccionado}.png"
+                st.caption("👁️ Así se siente vivir aquí (Render 3D)")
                 
-                if os.path.exists(render_file):
-                    st.caption("👁️ Así se siente vivir aquí (Render 3D)")
-                    st.image(render_file, use_container_width=True)
-                else:
-                    # Mensaje discreto si falta la imagen
-                    st.info(f"ℹ️ Render no disponible ({render_file})")
+                # --- BÚSQUEDA INTELIGENTE DE IMAGEN (PNG o JPG) ---
+                base_name = f"render_modelo{modelo_seleccionado}"
+                possible_files = [f"{base_name}.png", f"{base_name}.jpg", f"{base_name}.jpeg"]
+                
+                image_found = False
+                for file_path in possible_files:
+                    if os.path.exists(file_path):
+                        st.image(file_path, use_container_width=True)
+                        image_found = True
+                        break 
+
+                if not image_found:
+                    st.info(f"ℹ️ Render no disponible. Se buscó: {', '.join(possible_files)}")
                 
                 st.markdown("---")
 

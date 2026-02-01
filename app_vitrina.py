@@ -1,11 +1,11 @@
 import streamlit as st
 import core_calculo as core
 import core_planos
-import os # Necesario para verificar si la imagen existe
+import os # Necesario para verificar si las imágenes existen
 
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
 
-# Estilos CSS
+# --- ESTILOS CSS (Optimizados) ---
 st.markdown("""
     <style>
     .big-font { font-size:28px !important; color: #154360; font-weight: 800;}
@@ -14,6 +14,7 @@ st.markdown("""
     .card { background-color: #ffffff; padding: 25px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #2980B9;}
     .check-list { background-color: #f8f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; }
     .highlight { color: #E67E22; font-weight: bold; }
+    .area-badge { background-color: #E67E22; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; vertical-align: middle;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -27,7 +28,7 @@ categoria = st.sidebar.radio("¿Qué deseas construir?", ["🏠 Casas Modulares"
 datos = None
 modelo_seleccionado = 0 
 
-# LÓGICA DE SELECCIÓN
+# LÓGICA DE SELECCIÓN Y CÁLCULO
 if categoria == "🏠 Casas Modulares":
     st.sidebar.markdown("---")
     st.sidebar.info("✨ Llave en Mano: Baños, Cocina, Redes y Vidrios.")
@@ -45,12 +46,13 @@ elif categoria == "⛺ Bóvedas":
     largo = st.sidebar.radio("Profundidad:", [3, 6], format_func=lambda x: f"{x} Metros")
     datos = core.generar_presupuesto("boveda", largo)
 
-# VISUALIZACIÓN DE RESULTADOS
+# --- VISUALIZACIÓN PRINCIPAL ---
 if datos:
+    # Título y Descripción General
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
 
-    # Métricas
+    # Métricas Superiores (Aquí también se ve el área)
     c1, c2, c3 = st.columns(3)
     if categoria == "🐟 Estanques":
         c1.metric("💧 Capacidad", f"{datos['volumen_litros']:,} L")
@@ -62,68 +64,82 @@ if datos:
     
     st.markdown("---")
 
-    # PESTAÑAS
-    tab1, tab2, tab3 = st.tabs(["📐 Distribución", "💰 Inversión", "🛒 Materiales"])
+    # PESTAÑAS DE DETALLE
+    tab1, tab2, tab3 = st.tabs(["📐 Distribución y Renders", "💰 Inversión", "🛒 Materiales"])
 
-    # 1. PESTAÑA DISEÑO
+    # 1. PESTAÑA DISEÑO (Renders + Planos + Áreas Notorias)
     with tab1:
         if categoria == "🏠 Casas Modulares":
             col_text, col_visual = st.columns([1, 1.5])
             
+            # Columna de Texto (Izquierda) - ÁREAS RESALTADAS AQUÍ
             with col_text:
                 if modelo == 1: 
-                    st.markdown("### 🌟 Concepto Loft")
+                    # Usamos HTML para resaltar el área en el título
+                    st.markdown(f"### 🌟 Concepto Loft | <span class='highlight'>{datos['area']} m²</span>", unsafe_allow_html=True)
                     st.write("Diseñado para maximizar la vista. La cama King Size 'flota' en el centro, mirando al paisaje, mientras que el baño y vestier quedan ocultos tras un muro cabecero funcional.")
                 elif modelo == 2: 
-                    st.markdown("### 🏡 Concepto Familiar")
-                    st.write("Privacidad ante todo. Un pasillo central separa acústicamente la zona social (ruido) de las habitaciones (descanso).")
+                    st.markdown(f"### 🏡 Concepto Familiar | <span class='highlight'>{datos['area']} m²</span>", unsafe_allow_html=True)
+                    st.write("Privacidad ante todo. Un pasillo central separa acústicamente la zona social (ruido) de las habitaciones (descanso). Ideal para lotes estrechos y largos.")
                 elif modelo == 3: 
-                    st.markdown("### 🏰 Concepto Hacienda")
-                    st.write("Majestuosidad rural. Un gran salón central de techo alto conecta dos alas independientes: una para los dueños y otra para huéspedes.")
+                    st.markdown(f"### 🏰 Concepto Hacienda | <span class='highlight'>{datos['area']} m²</span>", unsafe_allow_html=True)
+                    st.write("Majestuosidad rural. Un gran salón central de techo alto conecta dos alas independientes: una privada para los dueños y otra para huéspedes o hijos.")
             
+            # Columna Visual (Derecha) - RENDERS Y PLANOS
             with col_visual:
-                # --- LÓGICA VISUAL: RENDER + PLANO ---
+                # A. RENDER 3D (Según el modelo)
+                render_file = f"render_modelo{modelo_seleccionado}.png"
                 
-                # A. INTENTAR MOSTRAR RENDER SI EXISTE
-                if modelo_seleccionado == 1:
-                    st.caption("👁️ Render 3D - Experiencia Inmersiva")
-                    if os.path.exists("render_modelo1.png"):
-                        st.image("render_modelo1.png", use_container_width=True)
-                    else:
-                        st.info("ℹ️ Para ver el render, asegúrate que el archivo se llame 'render_modelo1.png'")
-                    st.markdown("---")
+                if os.path.exists(render_file):
+                    st.caption("👁️ Así se siente vivir aquí (Render 3D)")
+                    st.image(render_file, use_container_width=True)
+                else:
+                    # Mensaje discreto si falta la imagen
+                    st.info(f"ℹ️ Render no disponible ({render_file})")
+                
+                st.markdown("---")
 
-                # B. SIEMPRE MOSTRAR PLANO TÉCNICO
-                st.caption("📐 Plano de Distribución")
+                # B. PLANO TÉCNICO (Siempre visible)
+                st.caption(f"📐 Plano de Distribución ({datos['area']} m²)")
                 svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
                 st.markdown(svg_plano, unsafe_allow_html=True)
         
         elif categoria == "🐟 Estanques":
-            st.info("Diseño circular para máxima resistencia hidrostática.")
+            st.info("Diseño circular para máxima resistencia hidrostática utilizando la forma natural del tanque.")
         elif categoria == "⛺ Bóvedas":
-            st.info("Diseño de arco sobre muretes para altura y confort.")
+            st.info("Diseño de arco catenario sobre muretes rectos para ganar altura y confort habitable.")
 
     # 2. PESTAÑA FINANCIERA
     with tab2:
         col1, col2 = st.columns(2)
         with col1:
-             st.markdown(f'<div class="card"><div class="price-tag">${datos["precio_venta"]:,.0f}</div></div>', unsafe_allow_html=True)
+             st.markdown(f'<div class="card"><h3 style="text-align:center; color:#154360">Precio Llave en Mano</h3><div class="price-tag">${datos["precio_venta"]:,.0f}</div></div>', unsafe_allow_html=True)
         with col2:
-             st.write(f"**Costo Directo:** ${datos['costo_directo']:,.0f}")
-             st.progress(0.7, text="Margen Saludable")
+             st.markdown("#### 📊 Estructura de Costos")
+             st.write(f"**Costo Directo (Material + MO):** ${datos['costo_directo']:,.0f}")
+             # Barra de progreso visual para el margen
+             margen_pct = (datos['precio_venta'] - datos['costo_directo']) / datos['precio_venta']
+             st.progress(margen_pct, text=f"Margen Bruto Estimado: {int(margen_pct*100)}%")
+             st.caption("Nota: El margen cubre imprevistos, gestión y utilidad.")
 
     # 3. PESTAÑA COMPRAS
     with tab3:
         lc = datos['lista_compras']
-        st.write("### 📋 Resumen de Materiales")
+        st.write("### 📋 Listado Maestro de Insumos")
         c_a, c_b = st.columns(2)
         with c_a:
+            st.markdown('<p class="highlight">🧱 Obra Gris & Estructura</p>', unsafe_allow_html=True)
             st.checkbox(f"{lc['cemento']} Bultos Cemento", value=True)
-            if lc['cal'] > 0: st.checkbox(f"{lc['cal']} Bultos Cal", value=True)
-            st.checkbox(f"{lc['arena']} Arena", value=True)
-            st.checkbox(f"{lc['triturado']} Triturado", value=True)
+            if lc['cal'] > 0: st.checkbox(f"{lc['cal']} Bultos Cal Hidratada", value=True)
+            st.checkbox(f"{lc['arena']} m³ Arena", value=True)
+            if lc['triturado'] > 0: st.checkbox(f"{lc['triturado']} m³ Triturado", value=True)
+            if lc['malla'] > 0: st.checkbox(f"{lc['malla']} Paneles Malla", value=True)
         with c_b:
-            if lc['tubos'] > 0: st.checkbox(f"{lc['tubos']} Tubos Est.", value=True)
+            st.markdown('<p class="highlight">🦴 Refuerzos & Acabados</p>', unsafe_allow_html=True)
+            if lc['tubos'] > 0: st.checkbox(f"{lc['tubos']} Tubos Estructurales", value=True)
             if lc['varillas'] > 0: st.checkbox(f"{lc['varillas']} Varillas", value=True)
             if lc['alambron'] > 0: st.checkbox(f"{lc['alambron']} Kg Alambrón", value=True)
-            st.checkbox(f"{lc['malla']} Malla", value=True)
+            # Resumen de kits si es casa
+            if categoria == "🏠 Casas Modulares":
+                 st.checkbox(f"Kit Techo Nelta ({int(datos['area'])}m² cubiertos)", value=True)
+                 st.checkbox("Paquete Carpintería y Vidrios", value=True)

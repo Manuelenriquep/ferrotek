@@ -16,7 +16,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CORRECCIÓN 1: Banner sin advertencia roja ---
+# Banner Principal
 st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural", use_container_width=True)
 
 # --- MENÚ LATERAL ---
@@ -77,9 +77,22 @@ if datos:
                     st.markdown("**Concepto Hacienda:**\nGran salón central (40m2) y alas independientes.")
             
             with col_plan:
-                # --- CORRECCIÓN 2: DIBUJAR EL PLANO (No mostrar texto) ---
+                # --- LÓGICA HÍBRIDA: RENDER 3D + PLANO 2D ---
+                
+                # A. Si es el Modelo 1, mostramos la imagen 3D espectacular
+                if modelo_seleccionado == 1:
+                    st.markdown("### 👁️ Así se siente vivir aquí")
+                    try:
+                        # Busca el archivo 'render_modelo1.png' en la carpeta local
+                        st.image("render_modelo1.png", use_container_width=True, caption="Render fotorealista del Modelo 1") 
+                    except FileNotFoundError:
+                         # Si no la encuentra, muestra un aviso amigable en lugar de romper la app
+                         st.info("ℹ️ Imagen 3D no encontrada en el directorio. Asegúrate que se llame 'render_modelo1.png'.")
+                    st.markdown("---") # Separador visual
+
+                # B. Debajo (para todos los modelos) mostramos el plano técnico
+                st.markdown("### 📐 Plano Técnico")
                 svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
-                # La clave es 'unsafe_allow_html=True'
                 st.markdown(svg_plano, unsafe_allow_html=True) 
                 st.caption("Distribución Arquitectónica Optimizada")
         

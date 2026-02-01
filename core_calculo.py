@@ -1,230 +1,192 @@
 import math
 
-# --- CONFIGURACIÓN DE PRECIOS BUCARAMANGA (2026) ---
+# --- PRECIOS UNITARIOS BASE (¡ACTUALIZAR MENSUALMENTE!) ---
+# Estos precios son ejemplos, debes poner los reales de tu zona.
 PRECIOS = {
-    # OBRA GRIS
-    'cemento': 28000, 'cal': 8000, 'arena': 90000, 'triturado': 110000,
-    'malla': 20000, 'varilla': 22000, 'alambron_kg': 6500, 'tubo': 85000,
-    'perfil_c': 65000, 'teja_570': 240000, 'caballete': 25000, 'zaranda': 220000,
-    
-    # INSTALACIONES & ACABADOS
-    'kit_bano': 1200000, 'kit_cocina': 600000, 'punto_elec': 40000,
-    'microcemento': 28000, 'puerta_ext': 850000, 'puerta_int': 450000, 'ventana': 280000,
-    
-    # MANO DE OBRA
-    'mo_casa': 180000, 'mo_estanque': 120000
+    'cemento': 28000,     # Bulto 50kg Argis
+    'arena': 90000,       # Metro cúbico lavado
+    'triturado': 110000,  # Metro cúbico de 1/2"
+    'varilla': 25000,     # Varilla 1/2" x 6m
+    'malla': 180000,      # Malla electrosoldada (rollo/panel)
+    'tubo_est': 150000,   # Tubo estructural cuadrado
+    'alambron': 8000,     # Kilo
+    'cal': 15000,         # Bulto Cal Hidratada (para estanques)
+    # Factores de mano de obra y kits
+    'mo_m2_casa': 450000, # Mano de obra x m2 (obra gris)
+    'kit_techo_m2': 120000, # Nelta + perfiles x m2
+    'kit_vidrios_global_peq': 3500000, # Ventanería modelo pequeño
+    'kit_vidrios_global_med': 5000000, # Ventanería modelo mediano
+    'kit_vidrios_global_gra': 8000000, # Ventanería modelo grande
+    # Factores Bóvedas y Estanques
+    'mo_m2_ferro': 350000, # Mano de obra especializada ferrocemento
+    'kit_impermeabilizante': 450000,
+    'kit_fachada_boveda': 2500000,
+    'kit_hidraulico_estanque': 300000
 }
 
-def calcular_mezcla(area_m2, espesor_cm, tipo):
-    volumen_m3 = area_m2 * (espesor_cm / 100)
+def generar_presupuesto(tipo_proyecto, dimension_clave):
+    """
+    Función principal que orquesta el cálculo.
+    tipo_proyecto: "vivienda", "estanque", "boveda"
+    dimension_clave: Modelo (1,2,3), Diámetro (m) o Largo (m)
+    """
+    datos_calculados = {}
+
+    # 1. CÁLCULO DE MATERIALES FÍSICOS (Cantidades)
+    materiales = calcular_materiales_fisicos(tipo_proyecto, dimension_clave)
     
-    # RENDIMIENTOS ESTÁNDAR (La Cal es vital en ambos casos)
-    # Casa: 1:3:3 (Cemento:Arena:Cal) -> Más Cal para manejabilidad en muros altos
-    # Estanque: Mezcla más rica en cemento, pero CON CAL para impermeabilidad
-    
-    cemento = volumen_m3 * 8     # Bultos 50kg
-    arena = volumen_m3 * 1.1     # m3
-    cal = volumen_m3 * 25        # Bultos 10kg (Relleno de poros y plasticidad)
-    
-    costo = (cemento * PRECIOS['cemento']) + \
-            (cal * PRECIOS['cal']) + \
-            (arena * PRECIOS['arena'])
-            
-    return {'cemento': cemento, 'cal': cal, 'arena': arena, 'costo': costo}
+    if not materiales:
+        return None # Si no se pudo calcular
 
-def calcular_techo_casas(largo_casa):
-    cant_tejas = math.ceil(largo_casa / 1.0) 
-    cant_caballetes = math.ceil(largo_casa / 0.80)
-    metros_perfil = largo_casa * 8
-    cant_perfiles = math.ceil(metros_perfil / 6.0)
-    costo = (cant_tejas * PRECIOS['teja_570']) + (cant_caballetes * PRECIOS['caballete']) + (cant_perfiles * PRECIOS['perfil_c'])
-    return {'costo': costo, 'cantidades': {'tejas': cant_tejas, 'caballetes': cant_caballetes, 'perfiles': cant_perfiles}}
+    # 2. CÁLCULO FINANCIERO (Costos Directos)
+    costo_directo = 0
+    costo_directo += materiales.get('cemento', 0) * PRECIOS['cemento']
+    costo_directo += materiales.get('arena', 0) * PRECIOS['arena']
+    costo_directo += materiales.get('triturado', 0) * PRECIOS['triturado']
+    costo_directo += materiales.get('varillas', 0) * PRECIOS['varilla']
+    costo_directo += materiales.get('malla', 0) * PRECIOS['malla']
+    costo_directo += materiales.get('tubos', 0) * PRECIOS['tubo_est']
+    costo_directo += materiales.get('alambron', 0) * PRECIOS['alambron']
+    costo_directo += materiales.get('cal', 0) * PRECIOS['cal']
 
-def calcular_carpinteria(modelo):
-    if modelo == 1: p_ext, p_int, vent = 1, 1, 2
-    elif modelo == 2: p_ext, p_int, vent = 2, 3, 4
-    elif modelo == 3: p_ext, p_int, vent = 2, 5, 6
-    else: p_ext, p_int, vent = 0, 0, 0
-    costo = (p_ext * PRECIOS['puerta_ext']) + (p_int * PRECIOS['puerta_int']) + (vent * PRECIOS['ventana'])
-    return {'costo': costo, 'cantidades': {'p_ext': p_ext, 'p_int': p_int, 'vent': vent}}
+    # Costos adicionales según tipo (Mano de obra y Kits)
+    precio_venta_sugerido = 0
 
-def calcular_estructura(area_m2, tipo, largo_casa=0, dimension_estanque=0):
-    paneles_malla = math.ceil(area_m2 * 0.35)
-    rollos_zaranda = math.ceil(area_m2 / 27) 
-    cant_tubos, cant_varillas, cant_alambron = 0, 0, 0
-    datos_techo = {'costo': 0, 'cantidades': {}}
-
-    if tipo == "vivienda":
-        ancho = 5.00
-        perimetro = (ancho + largo_casa) * 2
-        total_metros_tubo = (math.ceil(perimetro/0.50) * 3.0) + (perimetro * 2)
-        cant_tubos = math.ceil(math.ceil(total_metros_tubo / 6.0) * 1.10)
-        costo_est = cant_tubos * PRECIOS['tubo']
-        datos_techo = calcular_techo_casas(largo_casa)
-        costo_extra = datos_techo['costo']
-        detalle = f"{cant_tubos} Tubos + Techo Nelta"
+    if tipo_proyecto == "vivienda":
+        area = materiales['info_area']
+        costo_mo = area * PRECIOS['mo_m2_casa']
+        costo_techo = area * PRECIOS['kit_techo_m2']
         
-    elif tipo == "boveda":
-        num_arcos = math.ceil(largo_casa / 0.50) + 1
-        cant_varillas = num_arcos 
-        metros_longitudinales = largo_casa * 7
-        cant_varillas += math.ceil(metros_longitudinales / 6.0)
-        num_tubos_murete = num_arcos * 2
-        metros_tubos_murete = num_tubos_murete * 0.90
-        metros_viga_piso = largo_casa * 2
-        total_metros_tubo = metros_tubos_murete + metros_viga_piso
-        cant_tubos = math.ceil(total_metros_tubo / 6.0)
-        costo_est = (cant_varillas * PRECIOS['varilla']) + (cant_tubos * PRECIOS['tubo'])
-        costo_extra = 0
-        detalle = f"{cant_tubos} Tubos + {cant_varillas} Varillas"
+        kit_vidrio = 0
+        if dimension_clave == 1: kit_vidrio = PRECIOS['kit_vidrios_global_peq']
+        elif dimension_clave == 2: kit_vidrio = PRECIOS['kit_vidrios_global_med']
+        elif dimension_clave == 3: kit_vidrio = PRECIOS['kit_vidrios_global_gra']
+        
+        costo_directo += costo_mo + costo_techo + kit_vidrio
+        # Margen objetivo para casas: 35%
+        precio_venta_sugerido = costo_directo / (1 - 0.35)
 
-    elif tipo == "estanque":
-        if dimension_estanque <= 1.5:
-            cant_alambron = math.ceil(area_m2 * 1.0) 
-            costo_est = cant_alambron * PRECIOS['alambron_kg']
-            detalle = f"{cant_alambron} Kg Alambrón (Ligero)"
-            paneles_malla = math.ceil(area_m2 * 0.15)
-        elif dimension_estanque <= 4:
-            cant_alambron = math.ceil(area_m2 * 1.5) 
-            costo_est = cant_alambron * PRECIOS['alambron_kg']
-            detalle = f"{cant_alambron} Kg Alambrón (4.2mm)"
-            paneles_malla = math.ceil(area_m2 * 0.15) 
-        else:
-            cant_varillas = math.ceil(area_m2 * 2.2)
-            costo_est = cant_varillas * PRECIOS['varilla']
-            detalle = f"{cant_varillas} Varillas Corrugadas"
-        costo_extra = 0
+    elif tipo_proyecto == "boveda":
+        area = materiales['info_area']
+        costo_mo = area * PRECIOS['mo_m2_ferro'] # MO especializada
+        costo_kits = PRECIOS['kit_impermeabilizante'] + PRECIOS['kit_fachada_boveda']
+        costo_directo += costo_mo + costo_kits
+        # Margen objetivo para bóvedas (nicho alto): 45%
+        precio_venta_sugerido = costo_directo / (1 - 0.45)
 
-    costo_mallas = (paneles_malla * PRECIOS['malla'] * 6) + (rollos_zaranda * PRECIOS['zaranda'])
-    
-    return {
-        'costo': int(costo_est + costo_mallas + costo_extra),
-        'detalle': detalle,
-        'cantidades': {
-            'malla': paneles_malla, 'zaranda': rollos_zaranda, 
-            'tubos': cant_tubos, 'varillas': cant_varillas,
-            'alambron': cant_alambron,
-            'techo': datos_techo.get('cantidades', {})
-        }
+    elif tipo_proyecto == "estanque":
+        # Cálculo aproximado MO para estanques basado en la superficie del tanque
+        diametro = dimension_clave
+        altura = 1.2
+        perimetro = math.pi * diametro
+        area_superficial_muro = perimetro * altura
+        area_piso = math.pi * (diametro/2)**2
+        area_total_trabajo = area_superficial_muro + area_piso
+        
+        costo_mo = area_total_trabajo * PRECIOS['mo_m2_ferro'] * 0.8 # Un poco más barato que bóveda
+        costo_directo += costo_mo + PRECIOS['kit_hidraulico_estanque']
+        # Margen objetivo para estanques (volumen): 30%
+        precio_venta_sugerido = costo_directo / (1 - 0.30)
+
+    # 3. EMPAQUETAR RESULTADOS PARA LA APP
+    datos_calculados = {
+        'nombre': materiales['info_nombre'],
+        'descripcion': materiales['info_desc'],
+        'area': materiales.get('info_area', 0), # M2
+        'altura': materiales.get('info_altura', 0), # Metros
+        'volumen_litros': materiales.get('info_volumen', 0), # Para estanques
+        'lista_compras': materiales,
+        'costo_directo': round(costo_directo, -3), # Redondear a miles
+        'precio_venta': round(precio_venta_sugerido, -3)
     }
 
-def generar_presupuesto(tipo, dimension):
-    ancho_std = 5.00 
-    costo_hidro, costo_elec, costo_carp = 0, 0, 0
-    lista_compras = {}
-    precio_mo = PRECIOS['mo_estanque'] if tipo == "estanque" else PRECIOS['mo_casa']
-    espesor_muro = 3.5
-    volumen_litros = 0
-    altura_util = 0
+    return datos_calculados
 
+
+def calcular_materiales_fisicos(tipo, dimension):
+    """
+    Devuelve un diccionario con las cantidades CRUDAS de materiales.
+    """
+    lista = {}
+
+    # --- A. CASAS MODULARES ---
     if tipo == "vivienda":
-        if dimension == 1: largo, area_piso, pts_elec, kits_bano = 7.00, 35.0, 18, 1
-        elif dimension == 2: largo, area_piso, pts_elec, kits_bano = 13.00, 65.0, 30, 1.5
-        elif dimension == 3: largo, area_piso, pts_elec, kits_bano = 22.00, 110.0, 50, 2
-        nombre, descripcion = f"Modelo {dimension}", "Llave en Mano"
-        costo_hidro = PRECIOS['kit_cocina'] + (PRECIOS['kit_bano'] * kits_bano)
-        costo_elec = pts_elec * PRECIOS['punto_elec']
-        carp = calcular_carpinteria(dimension)
-        costo_carp = carp['costo']
-        perimetro = (ancho_std + largo) * 2
-        area_total_fc = perimetro * 2.4 
-        lista_compras['hidro'] = {'baños': kits_bano, 'cocina': 1}
-        lista_compras['elec'] = pts_elec
-        lista_compras['carp'] = carp['cantidades']
-        altura_util = 2.40
+        if dimension == 1: # Modelo 35m2
+            lista = {'info_nombre': "Modelo 1: Loft (35m²)", 'info_desc': "Ideal para parejas o glamping de lujo. Espacio abierto optimizado.", 'info_area': 35, 'info_altura': 3.0,
+                     'cemento': 75, 'arena': 5, 'triturado': 3, 'varillas': 18, 'malla': 12, 'tubos': 6, 'alambron': 10}
+        elif dimension == 2: # Modelo 65m2
+            lista = {'info_nombre': "Modelo 2: Familiar (65m²)", 'info_desc': "Perfecta para familias pequeñas. 2 habitaciones y zona social amplia.", 'info_area': 65, 'info_altura': 3.2,
+                     'cemento': 130, 'arena': 9, 'triturado': 5, 'varillas': 30, 'malla': 22, 'tubos': 10, 'alambron': 20}
+        elif dimension == 3: # Modelo 110m2
+            lista = {'info_nombre': "Modelo 3: Hacienda (110m²)", 'info_desc': "La casa principal de la finca. 3 habitaciones, techos altos, gran presencia.", 'info_area': 110, 'info_altura': 4.5,
+                     'cemento': 210, 'arena': 15, 'triturado': 9, 'varillas': 45, 'malla': 38, 'tubos': 16, 'alambron': 35}
 
+    # --- B. ESTANQUES PISCÍCOLAS (Ferrocemento) ---
     elif tipo == "estanque":
-        espesor_muro = 2.5
-        altura_util = 1.20 
-        radio = dimension / 2
-        volumen_m3 = math.pi * (radio**2) * altura_util
-        volumen_litros = volumen_m3 * 1000
-        area_total_fc = (math.pi * (radio**2)) + (2 * math.pi * radio * altura_util)
+        diametro = dimension
+        altura = 1.2 # Altura estándar productiva
+        radio = diametro / 2
         
-        nombre = f"Estanque D={dimension}m ({int(volumen_litros):,} Litros)"
-        descripcion = f"Mezcla con Cal Hidrófuga | Vol: {volumen_m3:.1f} m³"
+        # Cálculos geométricos
+        perimetro = math.pi * diametro
         area_piso = math.pi * (radio**2)
-        largo = 0
+        area_muro = perimetro * altura
+        volumen_m3 = area_piso * altura
+        volumen_litros = int(volumen_m3 * 1000)
 
-    elif tipo == "boveda":
-        espesor_muro = 3.0 
-        ancho_bov = 3.80
-        perimetro_corte = (math.pi * (ancho_bov/2)) + (0.90 * 2)
-        area_techo_muros = perimetro_corte * dimension
-        area_tapa = (math.pi * ((ancho_bov/2)**2) / 2) + (ancho_bov * 0.90)
-        area_tapas = area_tapa * 2
-        area_total_fc = area_techo_muros + area_tapas
-        area_piso = ancho_bov * dimension
-        largo = dimension
-        altura_util = 2.80 
+        # Estimación de materiales (Ferrocemento: Paredes delgadas, mucha malla)
+        # Factores empíricos para tanque de 1.2m altura
+        factor_cemento_x_m3_volumen = 1.5 # Bultos por m3 de agua almacenada (aprox)
         
-        if dimension == 3:
-            nombre, descripcion = "Bóveda 3m (Bodega)", "Murete 90cm | Sin Baño"
-            costo_elec, costo_carp = 3 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['ventana']
-            lista_compras['elec'], lista_compras['carp'] = 3, {'p_ext': 1, 'p_int': 0, 'vent': 1}
-        else:
-            nombre, descripcion = "Bóveda 6m (Suite)", "Murete 90cm | Con Baño"
-            costo_elec, costo_carp = 8 * PRECIOS['punto_elec'], PRECIOS['puerta_ext'] + PRECIOS['puerta_int'] + (PRECIOS['ventana']*2)
-            costo_hidro = PRECIOS['kit_bano']
-            lista_compras['elec'], lista_compras['carp'], lista_compras['hidro'] = 8, {'p_ext': 1, 'p_int': 1, 'vent': 2}, {'baños': 1}
+        cemento_est = int(volumen_m3 * factor_cemento_x_m3_volumen)
+        # Ajuste para tanques muy pequeños (mínimo vital)
+        if cemento_est < 5: cemento_est = 5
 
-    # SIN ADITIVO, SOLO CAL
-    mezcla = calcular_mezcla(area_total_fc, espesor_muro, tipo)
-    
-    dim_est = dimension if tipo == "estanque" else 0
-    estructura = calcular_estructura(area_total_fc, tipo, largo, dim_est)
-    
-    costo_piso_concreto = 0
-    materiales_piso = {'cemento':0, 'arena':0, 'triturado':0}
-    if tipo in ["vivienda", "boveda"]:
-        if tipo == "vivienda": area_real_piso = area_piso
-        else: area_real_piso = ancho_bov * dimension
-        vol_piso = area_real_piso * 0.08 
-        c_piso, a_piso, t_piso = vol_piso*7, vol_piso*0.6, vol_piso*0.8
-        materiales_piso = {'cemento': c_piso, 'arena': a_piso, 'triturado': t_piso}
-        base = vol_piso * (PRECIOS['cemento']*7 + PRECIOS['arena']*0.6 + PRECIOS['triturado']*0.8)
-        acabado = area_real_piso * PRECIOS['microcemento']
-        costo_piso_concreto = base + acabado
-
-    if tipo == "estanque" and dimension <= 1.5:
-        costo_mano_obra = 250000 
-    else:
-        costo_mano_obra = area_total_fc * precio_mo
-
-    costo_directo = mezcla['costo'] + estructura['costo'] + costo_mano_obra + \
-                    costo_piso_concreto + costo_hidro + costo_elec + costo_carp
-    
-    margen = 1.30
-    if tipo == "estanque" and dimension <= 1.5:
-        margen = 1.25
-        
-    precio_venta = costo_directo * margen
-
-    total_cemento = mezcla['cemento'] + materiales_piso['cemento']
-    total_arena = mezcla['arena'] + materiales_piso['arena']
-    
-    return {
-        'nombre': nombre,
-        'descripcion': descripcion,
-        'area': round(area_piso if tipo == "vivienda" else area_total_fc, 1),
-        'volumen_litros': int(volumen_litros),
-        'altura': altura_util,
-        'costo_directo': int(costo_directo),
-        'precio_venta': int(precio_venta),
-        'lista_compras': {
-            'cemento': round(total_cemento, 1),
-            'cal': round(mezcla['cal'], 1),
-            'arena': round(total_arena, 1),
-            'triturado': round(materiales_piso['triturado'], 1),
-            'malla': estructura['cantidades']['malla'],
-            'zaranda': estructura['cantidades']['zaranda'],
-            'tubos': estructura['cantidades']['tubos'],
-            'varillas': estructura['cantidades']['varillas'],
-            'alambron': estructura['cantidades'].get('alambron', 0),
-            'techo': estructura['cantidades'].get('techo', {}),
-            'carpinteria': lista_compras.get('carp', {}),
-            'hidro': lista_compras.get('hidro', {}),
-            'elec': lista_compras.get('elec', 0),
-            'area_piso': round(area_piso if tipo != "estanque" else 0, 1)
+        lista = {
+            'info_nombre': f"Estanque Circular (Ø {diametro}m)",
+            'info_desc': "Tanque en ferrocemento para piscicultura intensiva. Paredes lisas, alta durabilidad.",
+            'info_area': round(area_piso, 1), # Área de huella
+            'info_altura': altura,
+            'info_volumen': volumen_litros,
+            # Materiales (Estimación)
+            'cemento': cemento_est,
+            'cal': int(cemento_est * 0.2), # Cal hidrófuga (20% del cemento)
+            'arena': round(cemento_est * 0.06, 1), # Relación empírica arena/cemento
+            'malla': int(area_muro * 1.2) + int(area_piso * 0.8), # Malla en muros (doble) y piso
+            'varillas': int(perimetro / 1.5), # Anillos de refuerzo
+            'alambron': int(cemento_est * 0.5)
         }
-    }
+
+    # --- C. BÓVEDAS GLAMPING (Ferrocemento) ---
+    elif tipo == "boveda":
+        largo = dimension
+        ancho_std = 3.5
+        altura_std = 2.8 # Altura en el punto más alto del arco
+        area_huella = largo * ancho_std
+        
+        # Estimación aproximada para estructura de arco en ferrocemento
+        # Requiere más malla y cemento por m2 que una casa tradicional, pero cero triturado grueso.
+        
+        cemento_bov = int(area_huella * 3.5) # Factor alto por ser pura cáscara de mortero
+        malla_bov = int(area_huella * 2.5) # Doble o triple capa de malla gallinero/electro
+        varillas_bov = int(largo * 4) # Refuerzos longitudinales y arcos principales
+        
+        desc = ""
+        if largo == 3: desc = "Cápsula compacta para parejas. Cama Queen y visual panorámica."
+        else: desc = "Suite profunda con espacio para sala de estar pequeña y baño al fondo."
+
+        lista = {
+            'info_nombre': f"Bóveda Glamping ({largo}m Profundidad)",
+            'info_desc': desc,
+            'info_area': round(area_huella, 1),
+            'info_altura': altura_std,
+            # Materiales
+            'cemento': cemento_bov,
+            'arena': round(cemento_bov * 0.05, 1),
+            'malla': malla_bov,
+            'varillas': varillas_bov,
+            'alambron': int(cemento_bov * 0.3),
+            'tubos': 2 # Marco estructural frontal básico
+        }
+
+    return lista

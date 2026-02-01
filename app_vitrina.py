@@ -18,7 +18,7 @@ DB_INICIAL = {
     "precios": {
         'cemento': 28000,     'arena': 90000,       'triturado': 110000,
         'varilla': 24000,     
-        'malla_electro': 210000, # <--- AJUSTADO: Precio aprox Malla 5mm (es mas cara que la de 4mm)
+        'malla_electro': 210000, # Precio Malla 5mm
         'malla_zaranda': 280000, 
         
         'perfil_phr_c': 65000, 
@@ -55,9 +55,7 @@ def cargar_db():
         data = json.load(f)
         if "config" not in data: data["config"] = DB_INICIAL["config"]
         if "pintura_asfaltica" not in data["precios"]: data["precios"]["pintura_asfaltica"] = 45000
-        # Asegurar precio de mano de obra actualizado
         if data["precios"].get("mo_m2_muro") == 65000: data["precios"]["mo_m2_muro"] = 45000
-        # Sugerir actualización de precio malla si está muy barato (era 180k)
         if data["precios"].get("malla_electro") == 180000: data["precios"]["malla_electro"] = 210000
         return data
 
@@ -168,7 +166,7 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         largo = dimension
         altura = extra_param['h'] if extra_param else 2.20
         es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
-        distancia_postes = extra_param.get('distancia', 2.0) # <--- DEFAULT 2.0m
+        distancia_postes = extra_param.get('distancia', 2.0)
         
         area_muro = largo * altura
         
@@ -176,7 +174,8 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         num_postes = math.ceil(largo / distancia_postes) + 1
         
         # Aprovechamiento: 1 barra 6m = 2 postes de 3m (2.20 libre + 0.80 enterrado)
-        perfiles_postes = math.ceil(num_postes / 2.0) 
+        postes_por_barra = 2.0 if altura <= 2.30 else 1.0
+        perfiles_postes = math.ceil(num_postes / postes_por_barra) 
         
         perfiles_U = math.ceil(largo / 6.0) if es_reforzado else 0
         
@@ -208,10 +207,10 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'alambron': int(cem_tot * 0.2)
         }
         
-        desc_tipo = "Doble 5mm" if es_reforzado else "Sencillo 5mm"
+        desc_tipo = "Doble Membrana" if es_reforzado else "Sencillo (1 Malla)"
         info = {
             'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
-            'info_desc': f"Postes a {distancia_postes}m. Malla 5mm. Altura {altura}m.",
+            'info_desc': f"Solución Híbrida Steel-Ferro. Altura {altura}m.",
             'info_area': area_muro, 'info_altura': altura
         }
         costo_extra = (area_muro * p['mo_m2_muro'])
@@ -225,7 +224,7 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         'cemento': 'Cemento Gris (Bultos)',
         'arena': 'Arena de Río (m³)',
         'triturado': 'Triturado 1/2 (m³)',
-        'malla_electro': 'Malla Electrosoldada 5mm (Paneles)', # <--- ACTUALIZADO
+        'malla_electro': 'Malla Electrosoldada 5mm (Paneles)', 
         'malla_zaranda': 'Malla Zaranda Fina 5x5 (Rollos)',
         'perfil_phr_c': 'Perfil PHR C Galv 89x38 (6m)', 
         'perfil_phr_u': 'Perfil PHR U (Pista) 90x40 (6m)', 
@@ -287,10 +286,13 @@ with st.sidebar:
         col_tipo, col_dist = st.columns(2)
         with col_tipo:
             tipo_m = st.radio("Estructura:", ["Sencillo (1 Malla)", "Reforzado (2 Mallas)"])
-        with col_dist:
-            # Aquí está el cambio: 2.0 es la opción por defecto
-            dist_p = st.radio("Separación Postes:", [1.5, 2.0, 3.0], index=1, format_func=lambda x: f"{x} m")
-            
+        # Solo el admin ve la opción de cambiar la distancia de postes. Para el cliente es transparente.
+        if es_admin:
+            with col_dist:
+                dist_p = st.radio("Separación Postes (Admin):", [1.5, 2.0, 3.0], index=1, format_func=lambda x: f"{x} m")
+        else:
+             dist_p = 2.0 # Default fijo para cliente
+
         c_m1, c_m2 = st.columns(2)
         with c_m1: dim_sel = st.number_input("Longitud (m):", min_value=10, value=50, step=10)
         with c_m2: extra_h = st.number_input("Altura (m):", min_value=1.5, value=2.20, step=0.1)
@@ -310,8 +312,14 @@ with tabs[0]:
             st.markdown(f'<p class="big-font">{datos.get("info_nombre")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
+            # --- AQUÍ ESTÁ EL CAMBIO EN LA VITRINA ---
             if categoria == CAT_MUROS:
-                 st.info("💡 **Configuración Óptima:** Malla 5mm + Postes a 2.0m (Cero desperdicio).")
+                 if "Reforzado" in tipo_m:
+                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y seguridad.")
+                 else:
+                     st.info("✅ **Opción Estándar:** Solución eficiente, rápida y garantizada.")
+            # ----------------------------------------
+            
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -342,7 +350,8 @@ with tabs[0]:
             
             if categoria != CAT_ESTANQUES:
                 if categoria == CAT_MUROS:
-                    st.info(f"🏗️ **Sistema:** Postes cada {dist_p}m. Malla Estructural 5mm.")
+                    # Mensaje comercial limpio
+                    st.info(f"🏗️ **Sistema:** Postes Galvanizados + Malla Estructural 5mm.")
                 else:
                     st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
@@ -361,13 +370,13 @@ if es_admin:
     with tabs[2]: # MANUAL TÉCNICO
         st.header("📚 Guía de Construcción Híbrida")
         
-        with st.expander("🧱 MUROS: LA REGLA DEL 3 (2.00m)"):
+        with st.expander("🧱 OPTIMIZACIÓN DE MUROS (SOLO INTERNO)"):
             st.markdown("""
-            **CONFIGURACIÓN "A LA FIJA" (RECOMENDADA)**
+            **CONFIGURACIÓN "A LA FIJA" (Rentabilidad Máxima)**
             * **Postes:** Cada **2.00 metros**.
             * **Malla:** Electrosoldada **5mm** (Panel 6.00m).
-            * **Lógica:** 1 Panel de Malla = 3 Espacios exactos de 2m.
-            * **Ventaja:** La malla de 5mm es rígida y no hace "barriga" en 2 metros. Cero desperdicio de cortes.
+            * **Razón:** 1 Panel de Malla = 3 Espacios exactos de 2m. Cero desperdicio.
+            * **Nota:** No compartir este detalle con el cliente, vender como "Sistema Modular".
             """)
             
         with st.expander("✂️ CORTES DE PERFIL"):

@@ -1,6 +1,7 @@
 import streamlit as st
 import core_calculo as core
 import core_planos
+import os # Necesario para verificar si la imagen existe
 
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
 
@@ -44,7 +45,7 @@ elif categoria == "⛺ Bóvedas":
     largo = st.sidebar.radio("Profundidad:", [3, 6], format_func=lambda x: f"{x} Metros")
     datos = core.generar_presupuesto("boveda", largo)
 
-# VISUALIZACIÓN
+# VISUALIZACIÓN DE RESULTADOS
 if datos:
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
@@ -67,34 +68,35 @@ if datos:
     # 1. PESTAÑA DISEÑO
     with tab1:
         if categoria == "🏠 Casas Modulares":
-            col_text, col_plan = st.columns([1, 1.5])
+            col_text, col_visual = st.columns([1, 1.5])
+            
             with col_text:
                 if modelo == 1: 
-                    st.markdown("**Concepto Loft:**\nCama central con vista, baño oculto y cocina kitchenette.")
+                    st.markdown("### 🌟 Concepto Loft")
+                    st.write("Diseñado para maximizar la vista. La cama King Size 'flota' en el centro, mirando al paisaje, mientras que el baño y vestier quedan ocultos tras un muro cabecero funcional.")
                 elif modelo == 2: 
-                    st.markdown("**Concepto Familiar:**\nHabitaciones separadas de la zona social para privacidad.")
+                    st.markdown("### 🏡 Concepto Familiar")
+                    st.write("Privacidad ante todo. Un pasillo central separa acústicamente la zona social (ruido) de las habitaciones (descanso).")
                 elif modelo == 3: 
-                    st.markdown("**Concepto Hacienda:**\nGran salón central (40m2) y alas independientes.")
+                    st.markdown("### 🏰 Concepto Hacienda")
+                    st.write("Majestuosidad rural. Un gran salón central de techo alto conecta dos alas independientes: una para los dueños y otra para huéspedes.")
             
-            with col_plan:
-                # --- LÓGICA HÍBRIDA: RENDER 3D + PLANO 2D ---
+            with col_visual:
+                # --- LÓGICA VISUAL: RENDER + PLANO ---
                 
-                # A. Si es el Modelo 1, mostramos la imagen 3D espectacular
+                # A. INTENTAR MOSTRAR RENDER SI EXISTE
                 if modelo_seleccionado == 1:
-                    st.markdown("### 👁️ Así se siente vivir aquí")
-                    try:
-                        # Busca el archivo 'render_modelo1.png' en la carpeta local
-                        st.image("render_modelo1.png", use_container_width=True, caption="Render fotorealista del Modelo 1") 
-                    except FileNotFoundError:
-                         # Si no la encuentra, muestra un aviso amigable en lugar de romper la app
-                         st.info("ℹ️ Imagen 3D no encontrada en el directorio. Asegúrate que se llame 'render_modelo1.png'.")
-                    st.markdown("---") # Separador visual
+                    st.caption("👁️ Render 3D - Experiencia Inmersiva")
+                    if os.path.exists("render_modelo1.png"):
+                        st.image("render_modelo1.png", use_container_width=True)
+                    else:
+                        st.info("ℹ️ Para ver el render, asegúrate que el archivo se llame 'render_modelo1.png'")
+                    st.markdown("---")
 
-                # B. Debajo (para todos los modelos) mostramos el plano técnico
-                st.markdown("### 📐 Plano Técnico")
+                # B. SIEMPRE MOSTRAR PLANO TÉCNICO
+                st.caption("📐 Plano de Distribución")
                 svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
-                st.markdown(svg_plano, unsafe_allow_html=True) 
-                st.caption("Distribución Arquitectónica Optimizada")
+                st.markdown(svg_plano, unsafe_allow_html=True)
         
         elif categoria == "🐟 Estanques":
             st.info("Diseño circular para máxima resistencia hidrostática.")

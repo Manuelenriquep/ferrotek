@@ -29,7 +29,7 @@ DB_INICIAL = {
         'mo_m2_casa': 220000, 
         'mo_m2_tanque': 75000, 
         'mo_m2_boveda': 85000,
-        'mo_m2_muro': 65000, 
+        'mo_m2_muro': 45000, 
         
         'kit_techo_m2': 110000, 
         'kit_vidrios_peq': 3200000, 'kit_vidrios_med': 4800000, 'kit_vidrios_gra': 7500000,
@@ -54,7 +54,7 @@ def cargar_db():
         data = json.load(f)
         if "config" not in data: data["config"] = DB_INICIAL["config"]
         if "pintura_asfaltica" not in data["precios"]: data["precios"]["pintura_asfaltica"] = 45000
-        if "mo_m2_muro" not in data["precios"]: data["precios"]["mo_m2_muro"] = 65000
+        if data["precios"].get("mo_m2_muro") == 65000: data["precios"]["mo_m2_muro"] = 45000
         return data
 
 def guardar_db(nueva_db):
@@ -162,14 +162,18 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
     # --- D. MUROS PERIMETRALES ---
     elif tipo == "cerramiento":
         largo = dimension
-        altura = extra_param['h'] if extra_param else 2.0
+        altura = extra_param['h'] if extra_param else 2.20
         es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
+        distancia_postes = extra_param.get('distancia', 1.5) # Nueva variable
         
         area_muro = largo * altura
         
-        # MODULACIÓN INTELIGENTE (1.5m para encajar en malla de 6m)
-        num_postes = math.ceil(largo / 1.5) + 1
-        perfiles_postes = math.ceil(num_postes / 2.0) 
+        # CÁLCULO DE POSTES (DINÁMICO SEGÚN DISTANCIA)
+        num_postes = math.ceil(largo / distancia_postes) + 1
+        
+        # Aprovechamiento de barra (Si altura <= 2.30, salen 2 postes de 1 barra)
+        postes_por_barra = 2.0 if altura <= 2.30 else 1.0
+        perfiles_postes = math.ceil(num_postes / postes_por_barra) 
         
         perfiles_U = math.ceil(largo / 6.0) if es_reforzado else 0
         
@@ -201,10 +205,10 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'alambron': int(cem_tot * 0.2)
         }
         
-        desc_tipo = "Doble Membrana + Solera Sup." if es_reforzado else "Membrana Sencilla (Económico)"
+        desc_tipo = "Doble Membrana" if es_reforzado else "Sencillo"
         info = {
             'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
-            'info_desc': f"Postes PHR C cada 1.5m (Módulo 6m). Altura {altura}m.",
+            'info_desc': f"Postes cada {distancia_postes}m. Altura {altura}m.",
             'info_area': area_muro, 'info_altura': altura
         }
         costo_extra = (area_muro * p['mo_m2_muro'])
@@ -265,7 +269,7 @@ with st.sidebar:
     
     categoria = st.radio("Línea de Negocio:", [CAT_CASAS, CAT_ESTANQUES, CAT_BOVEDAS, CAT_MUROS])
 
-    datos = None; mod_sel=0; dim_sel=0; extra_h=2.0; tipo_m="Económico"
+    datos = None; mod_sel=0; dim_sel=0; extra_h=2.20; tipo_m="Económico"; dist_p=1.5
     
     if categoria == CAT_CASAS:
         mod_sel = st.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
@@ -277,11 +281,17 @@ with st.sidebar:
         dim_sel = st.radio("Profundidad (m):", [3, 6])
         datos = calcular_materiales("boveda", dim_sel, st.session_state['db'])
     elif categoria == CAT_MUROS:
-        tipo_m = st.radio("Tipo de Estructura:", ["Económico (Sencillo)", "Reforzado (Doble Membrana)"])
+        col_tipo, col_dist = st.columns(2)
+        with col_tipo:
+            tipo_m = st.radio("Estructura:", ["Económico (Sencillo)", "Reforzado (Doble)"])
+        with col_dist:
+            dist_p = st.radio("Separación Postes:", [1.5, 3.0], format_func=lambda x: f"{x} m")
+            
         c_m1, c_m2 = st.columns(2)
         with c_m1: dim_sel = st.number_input("Longitud (m):", min_value=10, value=50, step=10)
-        with c_m2: extra_h = st.number_input("Altura (m):", min_value=1.5, value=2.0, step=0.1)
-        datos = calcular_materiales("cerramiento", dim_sel, st.session_state['db'], extra_param={'h': extra_h, 'tipo': tipo_m})
+        with c_m2: extra_h = st.number_input("Altura (m):", min_value=1.5, value=2.20, step=0.1)
+        
+        datos = calcular_materiales("cerramiento", dim_sel, st.session_state['db'], extra_param={'h': extra_h, 'tipo': tipo_m, 'distancia': dist_p})
 
 # VISTAS
 pestanas = ["👁️ Vitrina Comercial"]
@@ -297,10 +307,10 @@ with tabs[0]:
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
             if categoria == CAT_MUROS:
+                 if dist_p == 3.0:
+                     st.warning("💰 **MODO AHORRO MÁXIMO:** Postes a 3m. Ideal para linderos grandes.")
                  if "Reforzado" in tipo_m:
-                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos.")
-                 else:
-                     st.info("⚡ **Opción Estándar:** Rápida y económica.")
+                     st.success("🛡️ **Opción Premium:** Mayor resistencia.")
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -320,6 +330,8 @@ with tabs[0]:
                  st.metric("Metros Lineales", f"{dim_sel} ml")
                  precio_ml = datos["precio_venta"] / dim_sel
                  st.caption(f"Costo por ML: ${precio_ml:,.0f}")
+                 if extra_h == 2.0:
+                     st.info("💡 **Tip:** Puedes pedir este muro a **2.20m** por el mismo precio.")
             else:
                 m1, m2 = st.columns(2)
                 val = datos.get('info_volumen', datos.get('info_area'))
@@ -329,10 +341,7 @@ with tabs[0]:
             
             if categoria != CAT_ESTANQUES:
                 if categoria == CAT_MUROS:
-                    if "Reforzado" in tipo_m:
-                        st.info(f"🏗️ **Sistema:** Doble Malla Electro + Solera U.")
-                    else:
-                        st.info(f"🏗️ **Sistema:** Malla Sencilla (Sin Solera).")
+                    st.info(f"🏗️ **Sistema:** Postes cada {dist_p}m. {tipo_m}.")
                 else:
                     st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
@@ -351,26 +360,24 @@ if es_admin:
     with tabs[2]: # MANUAL TÉCNICO
         st.header("📚 Guía de Construcción Híbrida")
         
-        with st.expander("🧱 INSTRUCCIONES DE MONTAJE (MUROS)"):
+        with st.expander("🧱 MUROS: DISTANCIA ENTRE POSTES"):
             st.markdown("""
-            **1. Modulación Inteligente (Ahorro de Cortes):**
-            * La malla electrosoldada viene en paneles de **6.00 metros**.
-            * Los postes (PHR C) deben instalarse exactamente a **1.50 metros** (eje a eje).
-            * **¿Por qué?** Porque $1.5 \times 4 = 6.0$. Así el panel de malla siempre termina sobre un poste.
+            **OPCIÓN 1: ESTÁNDAR (1.50m)**
+            * **Uso:** Muros urbanos, fachadas de casas.
+            * **Ventaja:** Muy rígido, fácil de pañetar (no pandea).
+            * **Modulación:** 1 Panel de Malla (6m) = 4 Espacios de 1.5m.
 
-            **2. El Traslapo Perfecto:**
-            * Al modular a 6 metros, la unión entre dos mallas cae justo sobre la cara plana del Perfil C.
-            * **Acción:** Atornillar ambas mallas al mismo perfil. Esto rigidiza la unión y evita gastar alambre en empalmes aéreos.
-
-            **3. Orientación:**
-            * La Malla Zaranda (Rollos de 30m) se desenrolla horizontalmente, cubriendo todo sin cortes.
+            **OPCIÓN 2: AHORRO MÁXIMO (3.00m)** ⚠️
+            * **Uso:** Lotes grandes, fincas, cerramientos extensos.
+            * **Ahorro:** Usas la MITAD de los perfiles.
+            * **Modulación:** 1 Panel de Malla (6m) = 2 Espacios de 3.0m.
+            * **Precaución:** Tensar muy bien la malla para evitar barrigas al pañetar.
             """)
-        
-        with st.expander("🏗️ ESPECIFICACIONES GENERALES"):
+            
+        with st.expander("✂️ CORTES ÓPTIMOS"):
             st.markdown("""
-            * **Fijación:** Tornillos Wafer (Cabeza Lenteja) #8.
-            * **Cimentación:** Dados 40x40x60cm.
-            * **Mortero:** 1 Cemento : 3 Arena : Cal.
+            * **Altura 2.20m:** Permite sacar 2 postes de una barra de 6m (3m c/u -> 80cm enterrado + 2.20 libre).
+            * **Malla:** Siempre empalmar sobre el perfil C.
             """)
 
     with tabs[3]: # CONFIG

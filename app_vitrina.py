@@ -4,7 +4,6 @@ import os
 import math
 import json
 
-# CAMBIÉ EL TÍTULO PARA QUE SEPAS QUE ES LA VERSIÓN NUEVA
 st.set_page_config(page_title="Ferrotek | Catálogo 2026", page_icon="🏗️", layout="wide")
 
 # ==========================================
@@ -23,14 +22,14 @@ DB_INICIAL = {
         
         'perfil_phr_c': 65000, 
         'perfil_phr_u': 55000, 
-        'pintura_asfaltica': 45000, # <--- PINTURA ASFÁLTICA
+        'pintura_asfaltica': 45000, 
         
         'alambron': 8000,     'cal': 15000,
         
         'mo_m2_casa': 220000, 
         'mo_m2_tanque': 75000, 
         'mo_m2_boveda': 85000,
-        'mo_m2_muro': 65000, # Mano de obra muro
+        'mo_m2_muro': 65000, 
         
         'kit_techo_m2': 110000, 
         'kit_vidrios_peq': 3200000, 'kit_vidrios_med': 4800000, 'kit_vidrios_gra': 7500000,
@@ -53,7 +52,6 @@ def cargar_db():
         return DB_INICIAL
     with open(ARCHIVO_DB, 'r') as f:
         data = json.load(f)
-        # Parches de seguridad para actualizar DBs viejas
         if "config" not in data: data["config"] = DB_INICIAL["config"]
         if "pintura_asfaltica" not in data["precios"]: data["precios"]["pintura_asfaltica"] = 45000
         if "mo_m2_muro" not in data["precios"]: data["precios"]["mo_m2_muro"] = 65000
@@ -161,47 +159,60 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         info = {'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': f"Arcos PHR C.", 'info_area': round(area_piso, 1), 'info_altura': 2.8}
         costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
-    # --- D. MUROS PERIMETRALES (¡AQUÍ ESTÁ LA NUEVA OPCIÓN!) ---
+    # --- D. MUROS PERIMETRALES (CON 2 OPCIONES) ---
     elif tipo == "cerramiento":
-        largo = dimension; altura = extra_param if extra_param else 2.0
+        # Desempaquetar parámetros
+        largo = dimension
+        altura = extra_param['h'] if extra_param else 2.0
+        es_reforzado = (extra_param['tipo'] == "Reforzado (Doble Membrana)")
+        
         area_muro = largo * altura
         
-        # Estructura: Postes cada 1.5m
+        # 1. ESTRUCTURA
+        # Postes PHR C cada 1.5m
         num_postes = math.ceil(largo / 1.5) + 1
-        # 1 Perfil 6m rinde para 2 postes de 3m (2m libres + 0.6 enterrado + desperdicio)
         perfiles_postes = math.ceil(num_postes / 2.0) 
         
-        # Viga Superior (Perfil U)
-        perfiles_U = math.ceil(largo / 6.0)
+        # Solera Superior (Perfil U) -> SOLO SI ES REFORZADO
+        perfiles_U = math.ceil(largo / 6.0) if es_reforzado else 0
         
-        # Cimentación (Dados)
+        # 2. MALLAS
+        # Si es Reforzado: 2 Capas Electro (Doble Membrana). Si es Económico: 1 Capa.
+        factor_electro = 2.0 if es_reforzado else 1.0
+        cant_electro = math.ceil((area_muro * factor_electro) / AREA_PANEL_ELECTRO)
+        
+        # Zaranda siempre va por ambas caras (Sándwich visual)
+        cant_zaranda = math.ceil((area_muro * 2) / AREA_ROLLO_ZARANDA)
+
+        # 3. CIMENTACIÓN Y MORTERO
         vol_dados = num_postes * (0.4 * 0.4 * 0.6) 
         cem_dados = vol_dados * 7.0; arena_dados = vol_dados * 0.6; trit_dados = vol_dados * 0.7
         
-        # Mortero Muro (5cm)
-        vol_mortero = area_muro * 0.05
+        # Mortero: Si es doble membrana, gastamos un poquito más por el grosor del sándwich (6cm vs 5cm)
+        espesor = 0.06 if es_reforzado else 0.05
+        vol_mortero = area_muro * espesor
         cem_mortero = vol_mortero * 9.0; arena_mortero = vol_mortero * 1.1
         cem_tot = int(cem_dados + cem_mortero)
         
-        # Pintura Asfáltica (Protección patas de postes)
-        galones_asfalto = math.ceil(num_postes / 25.0) # 1 galón rinde 25 patas aprox
+        galones_asfalto = math.ceil(num_postes / 25.0) 
 
         lista_cantidades = {
             'cemento': cem_tot,
             'cal': int(cem_mortero * r['muro_cal_factor']),
             'arena': round(arena_dados + arena_mortero, 1),
             'triturado': round(trit_dados, 1),
-            'malla_electro': math.ceil(area_muro / AREA_PANEL_ELECTRO), 
-            'malla_zaranda': math.ceil((area_muro * 2) / AREA_ROLLO_ZARANDA), 
+            'malla_electro': cant_electro, 
+            'malla_zaranda': cant_zaranda, 
             'perfil_phr_c': perfiles_postes,
-            'perfil_phr_u': perfiles_U,
+            'perfil_phr_u': perfiles_U, # 0 si es económico
             'pintura_asfaltica': galones_asfalto,
             'alambron': int(cem_tot * 0.2)
         }
         
+        desc_tipo = "Doble Membrana + Solera Sup." if es_reforzado else "Membrana Sencilla (Económico)"
         info = {
-            'info_nombre': f"Muro Perimetral ({largo} ML)", 
-            'info_desc': f"Postes PHR C cada 1.5m. Malla atornillada. Altura {altura}m.",
+            'info_nombre': f"Muro {largo} ML - {desc_tipo}", 
+            'info_desc': f"Postes PHR C cada 1.5m. Altura {altura}m.",
             'info_area': area_muro, 'info_altura': altura
         }
         costo_extra = (area_muro * p['mo_m2_muro'])
@@ -253,17 +264,14 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # ----------------------------------------------------
-    # AQUÍ ESTÁ EL MENÚ LATERAL (¡ATENCIÓN AQUÍ!)
-    # ----------------------------------------------------
     CAT_CASAS = "🏠 Casas Modulares"
     CAT_ESTANQUES = "🐟 Estanques Piscícolas"
     CAT_BOVEDAS = "⛺ Bóvedas Glamping"
-    CAT_MUROS = "🧱 Muros Perimetrales" # <--- ¡AQUÍ ESTÁ LA NUEVA OPCIÓN!
+    CAT_MUROS = "🧱 Muros Perimetrales"
     
     categoria = st.radio("Línea de Negocio:", [CAT_CASAS, CAT_ESTANQUES, CAT_BOVEDAS, CAT_MUROS])
 
-    datos = None; mod_sel=0; dim_sel=0; extra_h=2.0
+    datos = None; mod_sel=0; dim_sel=0; extra_h=2.0; tipo_m="Económico"
     
     if categoria == CAT_CASAS:
         mod_sel = st.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
@@ -275,10 +283,12 @@ with st.sidebar:
         dim_sel = st.radio("Profundidad (m):", [3, 6])
         datos = calcular_materiales("boveda", dim_sel, st.session_state['db'])
     elif categoria == CAT_MUROS:
+        tipo_m = st.radio("Tipo de Estructura:", ["Económico (Sencillo)", "Reforzado (Doble Membrana)"])
         c_m1, c_m2 = st.columns(2)
         with c_m1: dim_sel = st.number_input("Longitud (m):", min_value=10, value=50, step=10)
         with c_m2: extra_h = st.number_input("Altura (m):", min_value=1.5, value=2.0, step=0.1)
-        datos = calcular_materiales("cerramiento", dim_sel, st.session_state['db'], extra_param=extra_h)
+        # Pasamos ambos parámetros
+        datos = calcular_materiales("cerramiento", dim_sel, st.session_state['db'], extra_param={'h': extra_h, 'tipo': tipo_m})
 
 # VISTAS
 pestanas = ["👁️ Vitrina Comercial"]
@@ -294,7 +304,10 @@ with tabs[0]:
             st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
             
             if categoria == CAT_MUROS:
-                 st.info("🧱 Muro Híbrido: Postes C Galvanizados + Ferrocemento.")
+                 if "Reforzado" in tipo_m:
+                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y altura.")
+                 else:
+                     st.info("⚡ **Opción Estándar:** Rápida y económica para linderos.")
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -322,7 +335,13 @@ with tabs[0]:
                 m2.metric("Altura", f"{datos['info_altura']} m")
             
             if categoria != CAT_ESTANQUES:
-                st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
+                if categoria == CAT_MUROS:
+                    if "Reforzado" in tipo_m:
+                        st.info(f"🏗️ **Sistema:** Doble Malla Electro + Solera U Superior.")
+                    else:
+                        st.info(f"🏗️ **Sistema:** Malla Sencilla (Sin Solera Superior).")
+                else:
+                    st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
 # 2. ADMIN
 if es_admin:
@@ -339,28 +358,26 @@ if es_admin:
     with tabs[2]: # MANUAL TÉCNICO
         st.header("📚 Guía de Construcción Híbrida")
         
-        with st.expander("🧱 CERRAMIENTO / MURO PERIMETRAL"):
+        with st.expander("🧱 TIPOS DE MURO (GUÍA DE VENTA Y OBRA)"):
             st.markdown("""
-            **1. Replanteo y Cimentación:**
-            * Trazar la línea del muro.
-            * Abrir huecos de 40x40x60cm cada 1.50 metros.
-            * Aplicar **Pintura Asfáltica** a los últimos 60cm de cada Perfil C (para evitar corrosión).
-            * Insertar el perfil, nivelar y fundir el dado de concreto (Ciclópeo).
-
-            **2. Estructura:**
-            * Instalar el perfil U superior (como viga de amarre) atornillado a los parales.
-            * Atornillar la Malla Electrosoldada (cara interna) al Perfil C con tornillos wafer.
-            * Instalar la Malla Zaranda por ambas caras (Sándwich), amarrando o grapando.
-
-            **3. Pañete (Revoque):**
-            * Lanzar mortero 1:3 + Cal.
-            * Espesor final: 5cm.
+            **A. MURO ECONÓMICO (SENCILLO)**
+            * **Cliente:** Lotes, fincas, divisiones simples.
+            * **Estructura:** Solo postes verticales.
+            * **Malla:** 1 Electro (Centro) + 2 Zaranda.
+            * **Ventaja:** Muy barato y rápido.
+            
+            **B. MURO REFORZADO (DOBLE MEMBRANA)**
+            * **Cliente:** Fachadas, muros altos, seguridad.
+            * **Estructura:** Postes verticales + **Solera U Superior (Amarre)**.
+            * **Malla:** **2 Electros** (Doble jaula) + 2 Zaranda.
+            * **Ventaja:** Indestructible, mayor espesor (6cm), soporta portones.
             """)
         
-        with st.expander("🏠 CASAS Y BÓVEDAS"):
+        with st.expander("🏗️ INSTALACIÓN GENERAL"):
             st.markdown("""
-            * **Fijación:** Usar tornillos autoperforantes cabeza lenteja (wafer) #8 x 1/2".
-            * **Curado:** Mojar las paredes 3 veces al día durante los primeros 4 días.
+            **1. Cimentación (Dados):** Huecos 40x40x60cm cada 1.5m. Pintura asfáltica en puntas.
+            **2. Mortero:** 1 Cemento : 3 Arena : Cal. Espesor 5-6cm.
+            **3. Curado:** Mojar 3 veces al día por 4 días.
             """)
 
     with tabs[3]: # CONFIG

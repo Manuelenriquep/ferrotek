@@ -25,8 +25,8 @@ DB_INICIAL = {
         'perfil_phr_u': 55000, 
         'pintura_asfaltica': 45000, 
         'esmalte_negro': 70000,
-        'vinilo_madera_m2': 55000, # <--- NUEVO: Precio m2 Vinilo PVC
-        'pegante_boxer': 60000,    # <--- NUEVO: Galón de Boxer
+        'vinilo_madera_m2': 55000, 
+        'pegante_boxer': 60000,    
         
         'alambron': 8000,     'cal': 15000,
         
@@ -94,7 +94,6 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
 
     # --- A. CASAS ---
     if tipo == "vivienda":
-        # Extraer parámetros de acabado
         es_madera = (extra_param == "Tipo Cabaña (Perfiles Madera)") if extra_param else False
         
         ALTURA_SOLERA = 2.40 
@@ -119,19 +118,13 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         
         galones_asfalto = math.ceil(perimetro_muros / 15.0)
         
-        # LÓGICA DE ACABADO ESTRUCTURAL
-        galones_esmalte = 0
-        m2_vinilo = 0
-        galones_boxer = 0
+        galones_esmalte = 0; m2_vinilo = 0; galones_boxer = 0
         
         if es_madera:
-            # 1 m2 de vinilo cubre aprox 11 ml de perfil (ancho 9cm). 
-            # Total metros lineales de estructura visible (aprox 70% de verticales)
             metros_lineales_visibles = total_C * 6.0 * 0.7 
-            m2_vinilo = math.ceil(metros_lineales_visibles * 0.09 * 1.1) # 10% desperdicio
-            galones_boxer = math.ceil(m2_vinilo / 15.0) # 1 galon rinde 15m2 pegado
+            m2_vinilo = math.ceil(metros_lineales_visibles * 0.09 * 1.1) 
+            galones_boxer = math.ceil(m2_vinilo / 15.0) 
         else:
-            # Pintura Negra
             galones_esmalte = math.ceil(total_C / 15.0)
 
         lista_cantidades = {
@@ -141,8 +134,8 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
             'perfil_phr_c': total_C, 'perfil_phr_u': cant_U,
             'pintura_asfaltica': galones_asfalto,
             'esmalte_negro': galones_esmalte,
-            'vinilo_madera_m2': m2_vinilo,  # <--- NUEVO
-            'pegante_boxer': galones_boxer, # <--- NUEVO
+            'vinilo_madera_m2': m2_vinilo,
+            'pegante_boxer': galones_boxer,
             'varillas': int(perimetro_muros), 'alambron': int(cem_tot * 0.3)
         }
         
@@ -261,8 +254,8 @@ def calcular_materiales(tipo, dimension, db, extra_param=None):
         'perfil_phr_u': 'Perfil PHR U (Pista) 90x40 (6m)', 
         'pintura_asfaltica': 'Pintura Asfáltica (Cimentación)',
         'esmalte_negro': 'Esmalte Negro Mate (Acabado)',
-        'vinilo_madera_m2': 'Vinilo PVC Tipo Madera (m²)', # <---
-        'pegante_boxer': 'Pegante Boxer (Galones)',        # <---
+        'vinilo_madera_m2': 'Vinilo PVC Tipo Madera (m²)',
+        'pegante_boxer': 'Pegante Boxer (Galones)',
         'varillas': 'Varilla Corrugada 1/2" (6m)',
         'alambron': 'Alambrón (kg)',
         'cal': 'Cal Hidratada (Bultos)'
@@ -318,7 +311,6 @@ with st.sidebar:
     
     if categoria == CAT_CASAS:
         mod_sel = st.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
-        # SELECTOR DE ACABADO PARA CASAS
         acab_casas = st.radio("Estilo de Estructura:", ["Tipo Industrial (Pintura Negra)", "Tipo Cabaña (Perfiles Madera)"])
         datos = calcular_materiales("vivienda", mod_sel, st.session_state['db'], extra_param=acab_casas)
         
@@ -364,7 +356,16 @@ with tabs[0]:
                     st.info("🎨 **Estilo Industrial:** Estructura en negro mate de alto contraste.")
             
             if categoria == CAT_MUROS:
+                 if "Sencillo" in tipo_m and dist_p == 2.0:
+                     st.markdown("""<div style="background-color:#fff3cd; color:#856404; padding:10px; border-radius:5px; border:1px solid #ffeeba;">
+                     🏆 <b>LA OPCIÓN MÁS VENDIDA:</b> Equilibrio perfecto entre precio y resistencia.
+                     </div>""", unsafe_allow_html=True)
+                 elif "Reforzado" in tipo_m:
+                     st.success("🛡️ **Opción Premium:** Mayor resistencia a impactos y seguridad.")
+                 
+                 st.write("") # Espacio
                  st.info("🎨 **Acabado:** Muro Natural (Arena/Cal) + Estructura Negra Mate.")
+
             else:
                 img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
                 found_img = False
@@ -395,7 +396,10 @@ with tabs[0]:
                 m2.metric("Altura", f"{datos['info_altura']} m")
             
             if categoria != CAT_ESTANQUES:
-                st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
+                if categoria == CAT_MUROS:
+                     st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Malla 5mm.")
+                else:
+                    st.info(f"🏗️ **Sistema:** Estructura PHR C Galvanizada + Piel Ferrocemento.")
 
 # 2. ADMIN
 if es_admin:
@@ -420,23 +424,23 @@ if es_admin:
     with tabs[2]: # MANUAL TÉCNICO
         st.header("📚 Guía de Construcción Híbrida")
         
-        with st.expander("🪵 ACABADO TIPO MADERA (CASAS)"):
+        with st.expander("🎨 ACABADOS Y PINTURA"):
             st.markdown("""
-            **MATERIALES**
-            * **Vinilo PVC:** Piso flexible 2mm o 3mm (No Click).
-            * **Pegante:** Boxer (Solución de caucho). NO usar el adhesivo del vinilo.
+            **1. ESTRUCTURA METÁLICA (PERFILES VISIBLES)**
+            * **Color:** Negro Mate (Esmalte 2 en 1).
+            * **Preparación:** Limpiar grasa del galvanizado con varsol/vinagre antes de pintar.
 
-            **INSTALACIÓN**
-            1. Limpiar el perfil con varsol.
-            2. Aplicar Boxer en el perfil y en la tira de vinilo.
-            3. Dejar secar 10-15 min (al tacto).
-            4. Pegar y martillar con mazo de goma.
+            **2. OPCIÓN CABAÑA (ENCHAPE)**
+            * **Material:** Vinilo PVC Tipo Madera (Flexible).
+            * **Pegante:** Boxer. (El autoadhesivo se despega con el sol).
             """)
             
-        with st.expander("🧱 OPTIMIZACIÓN DE MUROS"):
+        with st.expander("🧱 MUROS: CONFIGURACIÓN ESTRELLA"):
             st.markdown("""
-            * **Postes:** Cada 2.00 metros.
-            * **Malla:** 5mm (Panel 6m).
+            **LA FÓRMULA GANADORA (Sencillo + 2.0m):**
+            * Es la opción más rentable y fácil de vender.
+            * Postes cada 2.00m.
+            * Malla 5mm (Indispensable para rigidez).
             """)
 
     with tabs[3]: # CONFIG

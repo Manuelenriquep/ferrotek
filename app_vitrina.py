@@ -54,7 +54,6 @@ def calcular_interno(tipo, dimension):
             'cemento': cemento_est, 'cal': int(cemento_est * 0.2), 'arena': round(cemento_est * 0.06, 1),
             'malla': int(area_piso * 2), 'varillas': int(diametro * 2), 'alambron': int(cemento_est * 0.5)
         }
-        # Costo MO aproximado + Kit Hidráulico
         costo_extra = (area_piso * 1.5 * PRECIOS['mo_m2_ferro']) + PRECIOS['kit_hidraulico_estanque']
 
     # --- C. BÓVEDAS ---
@@ -111,28 +110,34 @@ st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural
 
 # --- MENÚ LATERAL ---
 st.sidebar.header("🛠️ Configurador de Proyectos")
-categoria = st.sidebar.radio("¿Qué deseas construir?", ["🏠 Casas Modulares", "🐟 Estanques Piscícolas", "⛺ Bóvedas Glamping"])
+
+# DEFINIMOS LOS NOMBRES EN VARIABLES PARA EVITAR ERRORES
+OPCION_CASAS = "🏠 Casas Modulares"
+OPCION_ESTANQUES = "🐟 Estanques Piscícolas"
+OPCION_BOVEDAS = "⛺ Bóvedas Glamping"
+
+categoria = st.sidebar.radio("¿Qué deseas construir?", [OPCION_CASAS, OPCION_ESTANQUES, OPCION_BOVEDAS])
 
 datos = None
 modelo_seleccionado = 0 
 dimension_seleccionada = 0
 
-# SELECCIÓN
-if categoria == "🏠 Casas Modulares":
+# --- LÓGICA DE SELECCIÓN ---
+if categoria == OPCION_CASAS:
     st.sidebar.markdown("---")
     st.sidebar.info("✨ Llave en Mano: Baños, Cocina, Redes y Vidrios.")
     modelo = st.sidebar.selectbox("Selecciona tu Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
     datos = calcular_interno("vivienda", modelo)
     modelo_seleccionado = modelo
 
-elif categoria == "🐟 Estanques":
+elif categoria == OPCION_ESTANQUES:
     st.sidebar.markdown("---")
     st.sidebar.success("💧 Garantía: Cal Hidrófuga + Malla Doble.")
     dim = st.sidebar.select_slider("Diámetro del Tanque:", [1, 2, 4, 8, 10, 12], value=8)
     datos = calcular_interno("estanque", dim)
     dimension_seleccionada = dim
 
-elif categoria == "⛺ Bóvedas":
+elif categoria == OPCION_BOVEDAS:
     st.sidebar.markdown("---")
     st.sidebar.warning("🚀 Rápido: Estructura Telescópica.")
     largo = st.sidebar.radio("Profundidad:", [3, 6], format_func=lambda x: f"{x} Metros")
@@ -145,14 +150,22 @@ if datos:
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
 
+    # --- CÁLCULO DE TIEMPOS DINÁMICO (CORREGIDO) ---
+    tiempo_entrega = "Consultar"
+    
+    if categoria == OPCION_CASAS:
+        if modelo_seleccionado == 1: tiempo_entrega = "30 - 45 Días"
+        elif modelo_seleccionado == 2: tiempo_entrega = "45 - 60 Días"
+        elif modelo_seleccionado == 3: tiempo_entrega = "75 - 90 Días" # <--- ¡AHORA SÍ ES REALISTA!
+    
+    elif categoria == OPCION_ESTANQUES: 
+        tiempo_entrega = "10 - 15 Días"
+    elif categoria == OPCION_BOVEDAS: 
+        tiempo_entrega = "15 - 20 Días"
+
     # Métricas
     c1, c2, c3 = st.columns(3)
-    tiempo_entrega = "Consultar"
-    if categoria == "🏠 Casas Modulares": tiempo_entrega = "30 - 45 Días"
-    elif categoria == "🐟 Estanques": tiempo_entrega = "10 - 15 Días"
-    elif categoria == "⛺ Bóvedas": tiempo_entrega = "15 - 20 Días"
-
-    if categoria == "🐟 Estanques":
+    if categoria == OPCION_ESTANQUES:
         c1.metric("💧 Capacidad", f"{datos['volumen_litros']:,} L")
         c2.metric("📏 Altura Muro", "1.20 m")
     else:
@@ -169,21 +182,21 @@ if datos:
     with tab1:
         col_text, col_visual = st.columns([1, 1.5])
         with col_text:
-            if categoria == "🏠 Casas Modulares":
+            if categoria == OPCION_CASAS:
                 if modelo == 1: st.write("Diseño Loft abierto para parejas.")
                 elif modelo == 2: st.write("Diseño familiar con separación de ambientes.")
                 elif modelo == 3: st.write("Gran casa tipo Hacienda con techos altos.")
-            elif categoria == "⛺ Bóvedas":
+            elif categoria == OPCION_BOVEDAS:
                 st.write(f"Bóveda de ferrocemento de {dimension_seleccionada}m de profundidad. Ideal para Glamping.")
-            elif categoria == "🐟 Estanques":
+            elif categoria == OPCION_ESTANQUES:
                 st.write("Tanque circular de alta producción en ferrocemento.")
 
         with col_visual:
             # Búsqueda de IMAGEN INTELIGENTE (PNG/JPG)
             img_name = ""
-            if categoria == "🏠 Casas Modulares": img_name = f"render_modelo{modelo_seleccionado}"
-            elif categoria == "⛺ Bóvedas": img_name = f"render_boveda{dimension_seleccionada}"
-            elif categoria == "🐟 Estanques": img_name = "render_estanque"
+            if categoria == OPCION_CASAS: img_name = f"render_modelo{modelo_seleccionado}"
+            elif categoria == OPCION_BOVEDAS: img_name = f"render_boveda{dimension_seleccionada}"
+            elif categoria == OPCION_ESTANQUES: img_name = "render_estanque"
 
             possible_files = [f"{img_name}.png", f"{img_name}.jpg", f"{img_name}.jpeg"]
             found = False
@@ -196,10 +209,13 @@ if datos:
                 st.info(f"Falta imagen: {img_name} (.png/.jpg)")
 
             # PLANO (Solo casas y bóvedas)
-            if categoria != "🐟 Estanques":
+            if categoria != OPCION_ESTANQUES:
                 st.caption("📐 Esquema de Distribución")
-                svg_plano = core_planos.dibujar_planta(1) # Genérico para evitar errores
-                st.markdown(svg_plano, unsafe_allow_html=True)
+                try:
+                    svg_plano = core_planos.dibujar_planta(1) # Genérico para evitar errores
+                    st.markdown(svg_plano, unsafe_allow_html=True)
+                except:
+                    st.error("Error cargando el plano.")
 
     # 2. FINANCIERA
     with tab2:

@@ -464,3 +464,45 @@ if es_admin:
             if "config" not in st.session_state['db']: st.session_state['db']["config"] = {}
             st.session_state['db']["config"]["margen_utilidad"] = new_m
             guardar_db(st.session_state['db']); st.rerun()
+# ... (Todo tu código anterior igual hasta el final de las pestañas)
+
+# ==========================================
+# 📲 BOTÓN DE CIERRE POR WHATSAPP (CON PROTECCIÓN)
+# ==========================================
+if datos: # Solo muestra el botón si ya hay un cálculo hecho
+    st.markdown("---")
+    st.subheader("📩 ¿Listo para iniciar tu proyecto?")
+
+    mi_celular = "573012428215" 
+    
+    # Mensaje más profesional para que sepas exactamente qué quiere el cliente
+    mensaje_base = (
+        f"Hola Ferrotek! 👋\n\n"
+        f"Coticé en la app un proyecto de: *{datos['info_nombre']}*\n"
+        f"Detalles: {datos['info_desc']}\n"
+        f"Precio estimado: *${datos['precio_venta']:,.0f} COP*\n\n"
+        f"Me gustaría recibir una asesoría formal."
+    )
+
+    import urllib.parse
+    link_wa = f"https://wa.me/{mi_celular}?text={urllib.parse.quote(mensaje_base)}"
+
+    st.markdown(f"""
+        <a href="{link_wa}" target="_blank" style="text-decoration: none;">
+            <div style="
+                background-color: #25D366;
+                color: white;
+                padding: 18px;
+                border-radius: 12px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 22px;
+                box-shadow: 0 6px 12px rgba(37,211,102,0.3);
+                transition: transform 0.2s;
+            ">
+                ✅ SOLICITAR ASESORÍA POR WHATSAPP
+            </div>
+        </a>
+    """, unsafe_allow_html=True)
+else:
+    st.info("👈 Selecciona una opción en el menú lateral para ver la cotización y contactarnos.")

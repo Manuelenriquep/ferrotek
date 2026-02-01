@@ -1,274 +1,315 @@
 import streamlit as st
 import core_planos
-import os 
+import os
 import math
+import json
 
-st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
+st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="wide")
 
 # ==========================================
-# 🧠 CEREBRO DE CÁLCULO (PRECIOS CORREGIDOS)
+# 💾 GESTIÓN DE DATOS
 # ==========================================
-PRECIOS = {
-    'cemento': 28000,     'arena': 90000,       'triturado': 110000,
-    'varilla': 25000,     'malla': 180000,      'tubo_est': 150000,
-    'alambron': 8000,     'cal': 15000,
-    # Mano de obra ajustada a la realidad rural
-    'mo_m2_casa': 450000,     # Obra gris tradicional
-    'mo_m2_tanque': 70000,    # Ferrocemento (Muro + Piso)
-    'mo_m2_boveda': 80000,    # Ferrocemento Altura
-    
-    'kit_techo_m2': 120000,
-    'kit_vidrios_global_peq': 3500000, 'kit_vidrios_global_med': 5000000, 'kit_vidrios_global_gra': 8000000,
-    'kit_impermeabilizante': 450000,
-    'kit_fachada_boveda': 2500000, 
-    'kit_hidraulico_estanque': 300000
+ARCHIVO_DB = 'ferrotek_db.json'
+
+DB_INICIAL = {
+    "precios": {
+        'cemento': 28000,     'arena': 90000,       'triturado': 110000,
+        'varilla': 24000,     'malla_electro': 180000, 
+        'malla_zaranda': 280000, 
+        
+        # REFERENCIA TÉCNICA COMPLETA (PHR C)
+        'perfil_phr_c': 65000, # Barra 6m Cal 20 (89x38mm)
+        
+        'alambron': 8000,     'cal': 15000,
+        
+        'mo_m2_casa': 250000, 
+        'mo_m2_tanque': 75000, 
+        'mo_m2_boveda': 85000,
+        
+        'kit_techo_m2': 120000,
+        'kit_vidrios_peq': 3500000, 'kit_vidrios_med': 5000000, 'kit_vidrios_gra': 8000000,
+        'kit_impermeabilizante': 450000,
+        'kit_fachada_boveda': 2500000, 
+        'kit_hidraulico_estanque': 300000
+    },
+    "receta_mezcla": {
+        "muro_cemento_arena": 3.0,   
+        "muro_cal_factor": 0.5,      
+        "piso_cemento_arena": 2.0,   
+        "piso_triturado": 3.0
+    }
 }
 
-# Constantes Técnicas
-AREA_PANEL_MALLA = 13.0  # m2 reales que rinde un panel (descontando traslapos)
-BULTOS_POR_M3 = 9        # Rendimiento mezcla
+def cargar_db():
+    if not os.path.exists(ARCHIVO_DB):
+        with open(ARCHIVO_DB, 'w') as f:
+            json.dump(DB_INICIAL, f)
+        return DB_INICIAL
+    with open(ARCHIVO_DB, 'r') as f:
+        return json.load(f)
 
-def calcular_interno(tipo, dimension):
-    lista = {}
+def guardar_db(nueva_db):
+    with open(ARCHIVO_DB, 'w') as f:
+        json.dump(nueva_db, f)
+
+if 'db' not in st.session_state:
+    st.session_state['db'] = cargar_db()
+
+# ==========================================
+# 🧠 CEREBRO DE CÁLCULO
+# ==========================================
+AREA_PANEL_ELECTRO = 13.0 
+AREA_ROLLO_ZARANDA = 40.0 
+
+def calcular_materiales(tipo, dimension, db):
+    p = db['precios']
+    r = db['receta_mezcla']
+    
+    # Variables internas
+    lista_cantidades = {} # Para cálculo interno
+    lista_visible = {}    # Para mostrar al usuario con nombres bonitos
+    
     costo_extra = 0
     margen = 0.35 
 
-    # --- A. CASAS (Cálculo Tradicional) ---
+    # --- A. CASAS (STEEL FRAMING PHR C) ---
     if tipo == "vivienda":
         margen = 0.35
-        if dimension == 1:
-            lista = {'info_nombre': "Modelo 1: Loft (35m²)", 'info_desc': "Ideal para parejas. Espacio abierto optimizado.", 'info_area': 35, 'info_altura': 3.0, 'cemento': 75, 'arena': 5, 'triturado': 3, 'varillas': 18, 'malla': 12, 'tubos': 6, 'alambron': 10}
-            costo_extra = PRECIOS['kit_vidrios_global_peq']
-        elif dimension == 2:
-            lista = {'info_nombre': "Modelo 2: Familiar (65m²)", 'info_desc': "2 habitaciones y zona social amplia.", 'info_area': 65, 'info_altura': 3.2, 'cemento': 130, 'arena': 9, 'triturado': 5, 'varillas': 30, 'malla': 22, 'tubos': 10, 'alambron': 20}
-            costo_extra = PRECIOS['kit_vidrios_global_med']
-        elif dimension == 3:
-            lista = {'info_nombre': "Modelo 3: Hacienda (110m²)", 'info_desc': "Casa principal. 3 habitaciones, techos altos.", 'info_area': 110, 'info_altura': 4.5, 'cemento': 210, 'arena': 15, 'triturado': 9, 'varillas': 45, 'malla': 38, 'tubos': 16, 'alambron': 35}
-            costo_extra = PRECIOS['kit_vidrios_global_gra']
+        ALTURA_SOLERA = 2.40 
         
-        costo_extra += (lista['info_area'] * PRECIOS['mo_m2_casa']) + (lista['info_area'] * PRECIOS['kit_techo_m2'])
+        if dimension == 1:
+            nombre = "Modelo 1: Loft (35m²)"
+            area_piso = 35; perimetro_muros = 24
+            kit_vidrio = p['kit_vidrios_peq']
+        elif dimension == 2:
+            nombre = "Modelo 2: Familiar (65m²)"
+            area_piso = 65; perimetro_muros = 36
+            kit_vidrio = p['kit_vidrios_med']
+        elif dimension == 3:
+            nombre = "Modelo 3: Hacienda (110m²)"
+            area_piso = 110; perimetro_muros = 55
+            ALTURA_SOLERA = 2.60
+            kit_vidrio = p['kit_vidrios_gra']
 
-    # --- B. ESTANQUES (Cálculo Corregido) ---
+        # 1. ESTRUCTURA STEEL FRAMING (PHR C)
+        # Parales cada 50cm
+        num_parales = math.ceil(perimetro_muros / 0.50)
+        perfiles_verticales = math.ceil(num_parales / 2) 
+        metros_horizontales = perimetro_muros * 3 
+        perfiles_horizontales = math.ceil(metros_horizontales / 6)
+        total_perfiles = perfiles_verticales + perfiles_horizontales
+
+        # 2. CONCRETO
+        vol_piso = area_piso * 0.08
+        cem_piso = vol_piso * 7.5; arena_piso = vol_piso * 0.55; trit_piso = vol_piso * 0.85
+        
+        area_muros = perimetro_muros * ALTURA_SOLERA
+        vol_muros = area_muros * 0.05
+        cem_muro = vol_muros * 9.0; arena_muro = vol_muros * 1.1
+
+        # Construir listas
+        cem_tot = int(cem_piso + cem_muro)
+        lista_cantidades = {
+            'cemento': cem_tot,
+            'arena': round(arena_piso + arena_muro, 1),
+            'triturado': round(trit_piso, 1),
+            'malla_electro': math.ceil((area_muros * 1.1 + area_piso) / AREA_PANEL_ELECTRO),
+            'malla_zaranda': math.ceil((area_muros * 2 * 1.1) / AREA_ROLLO_ZARANDA),
+            'perfil_phr_c': total_perfiles, 
+            'varillas': int(perimetro_muros),
+            'alambron': int(cem_tot * 0.3)
+        }
+        
+        # Datos Informativos
+        info = {
+            'info_nombre': nombre, 
+            'info_desc': f"Estructura Galvanizada PHR C 89x38mm. Altura {ALTURA_SOLERA}m.",
+            'info_area': area_piso, 'info_altura': ALTURA_SOLERA
+        }
+        
+        costo_extra = (area_piso * p['mo_m2_casa']) + (area_piso * p['kit_techo_m2']) + kit_vidrio
+
+    # --- B. ESTANQUES ---
     elif tipo == "estanque":
         margen = 0.30
-        diametro = dimension
-        altura = 1.2
-        radio = diametro / 2
+        diametro = dimension; altura = 1.2; radio = diametro / 2
+        area_total = (math.pi * (radio**2)) + ((math.pi * diametro) * altura)
+
+        vol_tot = area_total * 0.06 
+        cem = int(vol_tot * 8.5)
+        if cem < 4: cem = 4
         
-        # Geometría
-        area_piso = math.pi * (radio**2)
-        area_muros = (math.pi * diametro) * altura
-        area_total = area_piso + area_muros 
-
-        # Materiales (Muro 5cm espesor)
-        volumen_mortero = area_total * 0.05
-        cemento_est = int(volumen_mortero * BULTOS_POR_M3)
-        if cemento_est < 4: cemento_est = 4
-
-        # Malla: 3 capas, PERO DIVIDIDO POR EL ÁREA DEL PANEL (Corrección Crítica)
-        area_malla_total = area_total * 3 
-        paneles_malla = math.ceil(area_malla_total / AREA_PANEL_MALLA)
-
-        lista = {
-            'info_nombre': f"Estanque Circular (Ø {diametro}m)", 'info_desc': "Ferrocemento reforzado (5cm) para piscicultura.",
-            'info_area': round(area_piso, 1), 'info_altura': altura, 'info_volumen': int(area_piso * altura * 1000),
-            'cemento': cemento_est, 
-            'cal': int(cemento_est * 0.2), 
-            'arena': round(volumen_mortero * 1.1, 1),
-            'malla': paneles_malla,  # Ahora sí son Paneles, no m2
-            'varillas': int(diametro * 2.5), 
-            'alambron': int(cemento_est * 0.4)
+        lista_cantidades = {
+            'cemento': cem, 
+            'cal': int(cem * r['muro_cal_factor']), 
+            'arena': round(vol_tot * 1.0, 1),
+            'malla_electro': math.ceil((area_total * 1.15) / AREA_PANEL_ELECTRO),  
+            'malla_zaranda': math.ceil((area_total * 2 * 1.15) / AREA_ROLLO_ZARANDA),   
+            'varillas': int((math.pi * diametro * 7) / 6), 
+            'alambron': int(cem * 0.4) 
         }
-        costo_extra = (area_total * PRECIOS['mo_m2_tanque']) + PRECIOS['kit_hidraulico_estanque']
+        info = {
+            'info_nombre': f"Estanque Circular (Ø {diametro}m)", 
+            'info_desc': "Técnica Sándwich: Malla Zaranda + Electro.",
+            'info_area': round(math.pi * radio**2, 1), 'info_altura': altura, 'info_volumen': int(math.pi * radio**2 * altura * 1000)
+        }
+        costo_extra = (area_total * p['mo_m2_tanque']) + p['kit_hidraulico_estanque']
 
-    # --- C. BÓVEDAS (Cálculo Corregido) ---
+    # --- C. BÓVEDAS ---
     elif tipo == "boveda":
         margen = 0.40 
-        largo = dimension
-        ancho = 3.5
-        
-        # Geometría (Arco + Muretes) -> Aprox 7m de desarrollo transversal
-        perimetro_transversal = 7.1 
-        area_cascara = perimetro_transversal * largo
+        largo = dimension; ancho = 3.5
+        perimetro_arco = 7.1 
+        area_ferrocemento = (perimetro_arco * largo) + 14 
         area_piso = ancho * largo
-        area_culatas = 15 # Aprox frente y fondo
-        area_total_trabajo = area_cascara + area_culatas
-
-        # Materiales (Espesor 3.5cm)
-        volumen_mortero = area_total_trabajo * 0.035
-        cemento_bov = int(volumen_mortero * BULTOS_POR_M3)
         
-        # Malla: 2 capas, DIVIDIDO POR ÁREA DEL PANEL
-        area_malla_total = area_total_trabajo * 2
-        paneles_malla = math.ceil(area_malla_total / AREA_PANEL_MALLA)
-
-        desc = "Cápsula compacta (3.5cm espesor). Alta resistencia." if largo == 3 else "Suite profunda tipo túnel. Sismorresistente."
+        num_arcos = math.ceil(largo / 0.50) + 1 
+        perfiles_arcos = math.ceil(num_arcos * 1.3) 
+        metros_largueros = largo * 5
+        perfiles_largueros = math.ceil(metros_largueros / 6)
         
-        lista = {
-            'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': desc,
-            'info_area': round(area_piso, 1), 'info_altura': 2.8,
-            'cemento': cemento_bov, 
-            'arena': round(volumen_mortero * 1.1, 1),
-            'malla': paneles_malla, # Paneles corregidos
-            'varillas': int(largo * 3), 
-            'alambron': int(cemento_bov * 0.3), 
-            'tubos': 3
+        vol_tot = (area_piso * 0.07) + (area_ferrocemento * 0.035)
+        cem = int(vol_tot * 8.5)
+
+        lista_cantidades = {
+            'cemento': cem, 
+            'cal': int(cem * r['muro_cal_factor']),
+            'arena': round(vol_tot, 1),
+            'malla_electro': math.ceil(area_ferrocemento / AREA_PANEL_ELECTRO),
+            'malla_zaranda': math.ceil((area_ferrocemento * 2) / AREA_ROLLO_ZARANDA),
+            'perfil_phr_c': perfiles_arcos + perfiles_largueros,
+            'alambron': int(cem * 0.3)
         }
-        costo_extra = (area_total_trabajo * PRECIOS['mo_m2_boveda']) + PRECIOS['kit_impermeabilizante'] + PRECIOS['kit_fachada_boveda']
+        info = {
+            'info_nombre': f"Bóveda Glamping ({largo}m)", 
+            'info_desc': f"Arcos estructurales PHR C Galvanizados cada 50cm.",
+            'info_area': round(area_piso, 1), 'info_altura': 2.8
+        }
+        costo_extra = (area_ferrocemento * p['mo_m2_boveda']) + p['kit_impermeabilizante'] + p['kit_fachada_boveda']
 
-    # CÁLCULO FINAL PRECIO
-    costo_materiales = (lista.get('cemento',0)*PRECIOS['cemento']) + (lista.get('arena',0)*PRECIOS['arena']) + \
-                       (lista.get('triturado',0)*PRECIOS['triturado']) + (lista.get('varillas',0)*PRECIOS['varilla']) + \
-                       (lista.get('malla',0)*PRECIOS['malla']) + (lista.get('tubos',0)*PRECIOS['tubo_est']) + \
-                       (lista.get('cal',0)*PRECIOS['cal'])
-    
-    costo_total = costo_materiales + costo_extra
+    # CÁLCULO FINAL Y MAPEO DE NOMBRES BONITOS
+    costo_mat = sum([v * p[k] for k, v in lista_cantidades.items() if k in p and isinstance(v, (int, float))])
+    costo_total = costo_mat + costo_extra
     precio_venta = costo_total / (1 - margen)
-
-    return {
-        'nombre': lista['info_nombre'], 'descripcion': lista['info_desc'],
-        'area': lista['info_area'], 'altura': lista['info_altura'],
-        'volumen_litros': lista.get('info_volumen', 0),
-        'lista_compras': lista,
-        'costo_directo': round(costo_total, -3),
-        'precio_venta': round(precio_venta, -3)
+    
+    # Crear diccionario legible para la UI
+    nombres_legibles = {
+        'cemento': 'Cemento Gris (Bultos)',
+        'arena': 'Arena de Río (m³)',
+        'triturado': 'Triturado 1/2 (m³)',
+        'malla_electro': 'Malla Electrosoldada (Paneles)',
+        'malla_zaranda': 'Malla Zaranda Fina 5x5 (Rollos)',
+        'perfil_phr_c': 'Perfil PHR C Galv 89x38 Cal 20 (6m)', # <--- REFERENCIA COMPLETA
+        'varillas': 'Varilla Corrugada 1/2" (6m)',
+        'alambron': 'Alambrón (kg)',
+        'cal': 'Cal Hidratada (Bultos)'
     }
+    
+    for k, v in lista_cantidades.items():
+        nombre_bonito = nombres_legibles.get(k, k)
+        lista_visible[nombre_bonito] = v
+
+    return {**info, 'lista_compras_interna': lista_cantidades, 'lista_visible': lista_visible, 
+            'costo_directo': round(costo_total, -3), 'precio_venta': round(precio_venta, -3)}
 
 # ==========================================
 # 🎨 INTERFAZ GRÁFICA
 # ==========================================
-
-# --- ESTILOS CSS ---
-st.markdown("""
-    <style>
+st.markdown("""<style>
     .big-font { font-size:28px !important; color: #154360; font-weight: 800;}
     .sub-font { font-size:18px !important; color: #555; font-style: italic;}
     .price-tag { font-size:42px; color: #27AE60; font-weight: bold; background-color: #eafaf1; padding: 10px; border-radius: 8px; text-align: center;}
     .card { background-color: #ffffff; padding: 25px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 6px solid #2980B9;}
-    .highlight { color: #E67E22; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+</style>""", unsafe_allow_html=True)
 
-# Banner
-st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural", use_container_width=True)
-
-# --- MENÚ LATERAL ---
-st.sidebar.header("🛠️ Configurador de Proyectos")
-
-OPCION_CASAS = "🏠 Casas Modulares"
-OPCION_ESTANQUES = "🐟 Estanques Piscícolas"
-OPCION_BOVEDAS = "⛺ Bóvedas Glamping"
-
-categoria = st.sidebar.radio("¿Qué deseas construir?", [OPCION_CASAS, OPCION_ESTANQUES, OPCION_BOVEDAS])
-
-datos = None
-modelo_seleccionado = 0 
-dimension_seleccionada = 0
-
-# --- LÓGICA DE SELECCIÓN ---
-if categoria == OPCION_CASAS:
-    st.sidebar.markdown("---")
-    st.sidebar.info("✨ Llave en Mano: Baños, Cocina, Redes y Vidrios.")
-    modelo = st.sidebar.selectbox("Selecciona tu Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
-    datos = calcular_interno("vivienda", modelo)
-    modelo_seleccionado = modelo
-
-elif categoria == OPCION_ESTANQUES:
-    st.sidebar.markdown("---")
-    st.sidebar.success("💧 Garantía: Cal Hidrófuga + Malla Doble.")
-    dim = st.sidebar.select_slider("Diámetro del Tanque:", [1, 2, 4, 8, 10, 12], value=8)
-    datos = calcular_interno("estanque", dim)
-    dimension_seleccionada = dim
-
-elif categoria == OPCION_BOVEDAS:
-    st.sidebar.markdown("---")
-    st.sidebar.warning("🚀 Rápido: Estructura Telescópica.")
-    largo = st.sidebar.radio("Profundidad:", [3, 6], format_func=lambda x: f"{x} Metros")
-    datos = calcular_interno("boveda", largo)
-    dimension_seleccionada = largo
-
-# --- VISUALIZACIÓN ---
-if datos:
-    # Encabezado
-    st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
-
-    # --- TIEMPOS ---
-    tiempo_entrega = "Consultar"
-    if categoria == OPCION_CASAS:
-        if modelo_seleccionado == 1: tiempo_entrega = "30 - 45 Días"
-        elif modelo_seleccionado == 2: tiempo_entrega = "45 - 60 Días"
-        elif modelo_seleccionado == 3: tiempo_entrega = "75 - 90 Días"
-    elif categoria == OPCION_ESTANQUES: tiempo_entrega = "10 - 15 Días"
-    elif categoria == OPCION_BOVEDAS: tiempo_entrega = "15 - 20 Días"
-
-    # Métricas
-    c1, c2, c3 = st.columns(3)
-    if categoria == OPCION_ESTANQUES:
-        c1.metric("💧 Capacidad", f"{datos['volumen_litros']:,} L")
-        c2.metric("📏 Altura Muro", "1.20 m")
-    else:
-        c1.metric("📏 Área Total", f"{datos['area']} m²")
-        c2.metric("🏠 Altura", f"{datos['altura']} m")
-    c3.metric("🗓️ Tiempo Aprox.", tiempo_entrega)
+# LOGIN ADMIN
+es_admin = False
+with st.sidebar:
+    st.image("https://via.placeholder.com/300x100.png?text=FERROTEK+Admin", use_container_width=True)
+    with st.expander("🔒 Zona Administrativa"):
+        if st.text_input("Contraseña:", type="password") == "ferrotek2026":
+            es_admin = True
+            st.success("Modo Admin Activo")
     
     st.markdown("---")
+    CAT_CASAS, CAT_ESTANQUES, CAT_BOVEDAS = "🏠 Casas Modulares", "🐟 Estanques Piscícolas", "⛺ Bóvedas Glamping"
+    categoria = st.radio("Línea de Negocio:", [CAT_CASAS, CAT_ESTANQUES, CAT_BOVEDAS])
 
-    # Pestañas
-    tab1, tab2, tab3 = st.tabs(["👁️ Galería y Diseño", "💰 Inversión", "🛒 Materiales"])
+    datos = None; mod_sel=0; dim_sel=0
+    
+    if categoria == CAT_CASAS:
+        mod_sel = st.selectbox("Modelo:", [1, 2, 3], format_func=lambda x: f"Modelo {x}")
+        datos = calcular_materiales("vivienda", mod_sel, st.session_state['db'])
+    elif categoria == CAT_ESTANQUES:
+        dim_sel = st.select_slider("Diámetro (m):", [1, 2, 4, 8, 10, 12], value=8)
+        datos = calcular_materiales("estanque", dim_sel, st.session_state['db'])
+    elif categoria == CAT_BOVEDAS:
+        dim_sel = st.radio("Profundidad (m):", [3, 6])
+        datos = calcular_materiales("boveda", dim_sel, st.session_state['db'])
 
-    # 1. DISEÑO
-    with tab1:
-        col_text, col_visual = st.columns([1, 1.5])
-        with col_text:
-            if categoria == OPCION_CASAS:
-                st.write(f"Diseño optimizado Modelo {modelo_seleccionado}.")
-            elif categoria == OPCION_BOVEDAS:
-                st.write(f"Bóveda de ferrocemento de {dimension_seleccionada}m. Diseño Sismorresistente.")
-            elif categoria == OPCION_ESTANQUES:
-                st.write("Tanque circular de alta producción en ferrocemento.")
+# VISTAS
+pestanas = ["👁️ Vitrina Comercial"]
+if es_admin: pestanas += ["💰 Costos Detallados", "⚙️ Configuración"]
+tabs = st.tabs(pestanas)
 
-        with col_visual:
-            img_name = ""
-            if categoria == OPCION_CASAS: img_name = f"render_modelo{modelo_seleccionado}"
-            elif categoria == OPCION_BOVEDAS: img_name = f"render_boveda{dimension_seleccionada}"
-            elif categoria == OPCION_ESTANQUES: img_name = "render_estanque"
+# 1. VITRINA
+with tabs[0]:
+    if datos:
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.markdown(f'<p class="big-font">{datos.get("info_nombre")}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="sub-font">{datos.get("info_desc")}</p>', unsafe_allow_html=True)
+            
+            img_base = f"render_modelo{mod_sel}" if categoria == CAT_CASAS else (f"render_boveda{dim_sel}" if categoria == CAT_BOVEDAS else "render_estanque")
+            found_img = False
+            for ext in [".png", ".jpg", ".jpeg"]:
+                if os.path.exists(img_base + ext):
+                    st.image(img_base + ext, use_container_width=True); found_img=True; break
+            if not found_img: st.caption(f"📷 (Imagen pendiente: {img_base})")
 
-            possible_files = [f"{img_name}.png", f"{img_name}.jpg", f"{img_name}.jpeg"]
-            found = False
-            for f in possible_files:
-                if os.path.exists(f):
-                    st.image(f, use_container_width=True)
-                    found = True
-                    break
-            if not found:
-                st.info(f"Falta imagen: {img_name}")
-
-            if categoria != OPCION_ESTANQUES:
+            if categoria != CAT_ESTANQUES:
                 st.caption("📐 Esquema de Distribución")
-                try:
-                    st.markdown(core_planos.dibujar_planta(1), unsafe_allow_html=True)
+                try: st.markdown(core_planos.dibujar_planta(mod_sel if categoria == CAT_CASAS else 1), unsafe_allow_html=True)
                 except: pass
 
-    # 2. FINANCIERA
-    with tab2:
-        col1, col2 = st.columns(2)
-        with col1:
-             st.markdown(f'<div class="card"><h3 style="text-align:center; color:#154360">Precio Llave en Mano</h3><div class="price-tag">${datos["precio_venta"]:,.0f}</div></div>', unsafe_allow_html=True)
-        with col2:
-             st.write(f"**Costo Directo:** ${datos['costo_directo']:,.0f}")
-             st.progress(0.7, text="Margen Saludable")
+        with c2:
+            st.markdown(f'<div class="card"><h3 style="text-align:center;">Precio Llave en Mano</h3><div class="price-tag">${datos["precio_venta"]:,.0f}</div></div>', unsafe_allow_html=True)
+            m1, m2 = st.columns(2)
+            val = datos.get('info_volumen', datos.get('info_area'))
+            unit = 'L' if categoria==CAT_ESTANQUES else 'm²'
+            m1.metric("Área/Vol", f"{val} {unit}")
+            m2.metric("Altura", f"{datos['info_altura']} m")
+            
+            if categoria != CAT_ESTANQUES:
+                st.info(f"🏗️ **Estructura:** Perfil PHR C Galvanizado 89x38 cada 50cm.")
 
-    # 3. MATERIALES
-    with tab3:
-        lc = datos['lista_compras']
-        c_a, c_b = st.columns(2)
-        with c_a:
-            st.checkbox(f"{lc.get('cemento',0)} Bultos Cemento", value=True)
-            st.checkbox(f"{lc.get('arena',0)} m³ Arena", value=True)
-            if lc.get('triturado',0)>0: st.checkbox(f"{lc.get('triturado',0)} m³ Triturado", value=True)
-            if lc.get('malla',0)>0: st.checkbox(f"{lc.get('malla',0)} Paneles Malla", value=True)
-        with c_b:
-            if lc.get('tubos',0)>0: st.checkbox(f"{lc.get('tubos',0)} Tubos Est.", value=True)
-            if lc.get('varillas',0)>0: st.checkbox(f"{lc.get('varillas',0)} Varillas", value=True)
-            if lc.get('cal',0)>0: st.checkbox(f"{lc.get('cal',0)} Bultos Cal", value=True)
+# 2. ADMIN
+if es_admin:
+    with tabs[1]:
+        st.subheader("📊 Estructura de Costos")
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric("Costo Directo", f"${datos['costo_directo']:,.0f}")
+        utilidad = datos['precio_venta'] - datos['costo_directo']
+        kpi2.metric("Utilidad Bruta", f"${utilidad:,.0f}")
+        kpi3.metric("Margen", f"{int((utilidad/datos['precio_venta'])*100)}%")
+        
+        st.write("📋 **Lista de Materiales (Receta Técnica):**")
+        # Mostrar la lista bonita
+        st.dataframe(datos['lista_visible'], width=500)
+
+    with tabs[2]:
+        st.subheader("⚙️ Configuración")
+        col_p, col_r = st.columns(2)
+        with col_p:
+            st.write("**Precios Unitarios:**")
+            new_prices = st.data_editor(st.session_state['db']['precios'], height=400)
+        with col_r:
+            st.write("**🧪 Receta:**")
+            new_receta = st.data_editor(st.session_state['db']['receta_mezcla'])
+        
+        if st.button("💾 Guardar Cambios"):
+            st.session_state['db']['precios'] = new_prices
+            st.session_state['db']['receta_mezcla'] = new_receta
+            guardar_db(st.session_state['db'])
+            st.success("¡Guardado!")
+            st.rerun()

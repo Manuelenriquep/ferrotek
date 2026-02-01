@@ -1,36 +1,32 @@
 import streamlit as st
 import core_planos
-import os # Necesario para buscar imágenes
+import os 
 import math
 
 st.set_page_config(page_title="Ferrotek | Catálogo Digital", page_icon="🏡", layout="centered")
 
 # ==========================================
-# 🧠 CEREBRO DE CÁLCULO (INGENIERÍA DE FERROCEMENTO AJUSTADA)
+# 🧠 CEREBRO DE CÁLCULO (PRECIOS CORREGIDOS)
 # ==========================================
 PRECIOS = {
     'cemento': 28000,     'arena': 90000,       'triturado': 110000,
     'varilla': 25000,     'malla': 180000,      'tubo_est': 150000,
     'alambron': 8000,     'cal': 15000,
-    'mo_m2_casa': 450000, 'kit_techo_m2': 120000,
+    # Mano de obra ajustada a la realidad rural
+    'mo_m2_casa': 450000,     # Obra gris tradicional
+    'mo_m2_tanque': 70000,    # Ferrocemento (Muro + Piso)
+    'mo_m2_boveda': 80000,    # Ferrocemento Altura
+    
+    'kit_techo_m2': 120000,
     'kit_vidrios_global_peq': 3500000, 'kit_vidrios_global_med': 5000000, 'kit_vidrios_global_gra': 8000000,
-    # MO Ferrocemento: El m2 de tanque se paga mejor por el riesgo de fugas
-    'mo_m2_tanque': 140000, 
-    'mo_m2_boveda': 110000,
     'kit_impermeabilizante': 450000,
-    'kit_fachada_boveda': 2500000, 'kit_hidraulico_estanque': 300000
+    'kit_fachada_boveda': 2500000, 
+    'kit_hidraulico_estanque': 300000
 }
 
-# --- CONSTANTES TÉCNICAS (SEGÚN MANUALES) ---
-AREA_PANEL_MALLA = 13.0  # Panel estándar (con traslapos)
-BULTOS_POR_M3 = 9        # Rendimiento mezcla 1:3
-
-# DIFERENCIA CLAVE: Espesores y Capas
-ESPESOR_TANQUE = 0.05    # 5 cm (Presión Hidrostática)
-CAPAS_MALLA_TANQUE = 3   # Mayor refuerzo
-
-ESPESOR_BOVEDA = 0.035   # 3.5 cm (Cáscara liviana a compresión)
-CAPAS_MALLA_BOVEDA = 2   # Refuerzo estándar
+# Constantes Técnicas
+AREA_PANEL_MALLA = 13.0  # m2 reales que rinde un panel (descontando traslapos)
+BULTOS_POR_M3 = 9        # Rendimiento mezcla
 
 def calcular_interno(tipo, dimension):
     lista = {}
@@ -52,7 +48,7 @@ def calcular_interno(tipo, dimension):
         
         costo_extra += (lista['info_area'] * PRECIOS['mo_m2_casa']) + (lista['info_area'] * PRECIOS['kit_techo_m2'])
 
-    # --- B. ESTANQUES (Pesados y Resistentes) ---
+    # --- B. ESTANQUES (Cálculo Corregido) ---
     elif tipo == "estanque":
         margen = 0.30
         diametro = dimension
@@ -61,72 +57,63 @@ def calcular_interno(tipo, dimension):
         
         # Geometría
         area_piso = math.pi * (radio**2)
-        perimetro = math.pi * diametro
-        area_muros = perimetro * altura
-        area_total_superficie = area_piso + area_muros 
+        area_muros = (math.pi * diametro) * altura
+        area_total = area_piso + area_muros 
 
-        # Materiales (Espesor Grueso 5cm)
-        volumen_mortero = area_total_superficie * ESPESOR_TANQUE
+        # Materiales (Muro 5cm espesor)
+        volumen_mortero = area_total * 0.05
         cemento_est = int(volumen_mortero * BULTOS_POR_M3)
-        if cemento_est < 3: cemento_est = 3
+        if cemento_est < 4: cemento_est = 4
 
-        # Malla: 3 capas (Tanque)
-        area_malla_requerida = area_total_superficie * CAPAS_MALLA_TANQUE
-        paneles_malla = math.ceil(area_malla_requerida / AREA_PANEL_MALLA)
+        # Malla: 3 capas, PERO DIVIDIDO POR EL ÁREA DEL PANEL (Corrección Crítica)
+        area_malla_total = area_total * 3 
+        paneles_malla = math.ceil(area_malla_total / AREA_PANEL_MALLA)
 
         lista = {
-            'info_nombre': f"Estanque Circular (Ø {diametro}m)", 'info_desc': "Ferrocemento reforzado (5cm) para presión de agua.",
+            'info_nombre': f"Estanque Circular (Ø {diametro}m)", 'info_desc': "Ferrocemento reforzado (5cm) para piscicultura.",
             'info_area': round(area_piso, 1), 'info_altura': altura, 'info_volumen': int(area_piso * altura * 1000),
             'cemento': cemento_est, 
-            'cal': int(cemento_est * 0.20), # Más cal para impermeabilizar
+            'cal': int(cemento_est * 0.2), 
             'arena': round(volumen_mortero * 1.1, 1),
-            'malla': paneles_malla, 
-            'varillas': int(perimetro / 1.5), # Anillos refuerzo cerrados
+            'malla': paneles_malla,  # Ahora sí son Paneles, no m2
+            'varillas': int(diametro * 2.5), 
             'alambron': int(cemento_est * 0.4)
         }
-        costo_extra = (area_total_superficie * PRECIOS['mo_m2_tanque']) + PRECIOS['kit_hidraulico_estanque']
+        costo_extra = (area_total * PRECIOS['mo_m2_tanque']) + PRECIOS['kit_hidraulico_estanque']
 
-    # --- C. BÓVEDAS (Livianas y Estructurales) ---
+    # --- C. BÓVEDAS (Cálculo Corregido) ---
     elif tipo == "boveda":
-        margen = 0.40 # Margen Glamping
+        margen = 0.40 
         largo = dimension
         ancho = 3.5
-        radio_arco = ancho / 2.0 # 1.75
         
-        # Geometría Exacta (Muretes 0.8 + Semicírculo)
-        perimetro_arco = (math.pi * radio_arco) # Parte curva (5.5m aprox)
-        perimetro_muretes = 0.8 * 2             # Parte recta (1.6m)
-        perimetro_transversal = perimetro_arco + perimetro_muretes # ~7.1m
-        
+        # Geometría (Arco + Muretes) -> Aprox 7m de desarrollo transversal
+        perimetro_transversal = 7.1 
         area_cascara = perimetro_transversal * largo
         area_piso = ancho * largo
-        
-        # Culatas (Frente y Fondo) - Aprox
-        area_culata_individual = (ancho * 0.8) + (math.pi * radio_arco**2 / 2) # Rectángulo + Semicírculo
-        area_culatas = area_culata_individual * 2
-        
-        area_total_trabajo = area_cascara + area_culatas # No contamos piso en ferrocemento (es concreto simple usualmente, pero simplificamos)
+        area_culatas = 15 # Aprox frente y fondo
+        area_total_trabajo = area_cascara + area_culatas
 
-        # Materiales (Espesor Delgado 3.5cm) - ¡AQUÍ ESTÁ EL AHORRO!
-        volumen_mortero = area_total_trabajo * ESPESOR_BOVEDA
+        # Materiales (Espesor 3.5cm)
+        volumen_mortero = area_total_trabajo * 0.035
         cemento_bov = int(volumen_mortero * BULTOS_POR_M3)
         
-        # Malla: 2 capas (Bóveda)
-        paneles_malla = math.ceil((area_total_trabajo * CAPAS_MALLA_BOVEDA) / AREA_PANEL_MALLA)
+        # Malla: 2 capas, DIVIDIDO POR ÁREA DEL PANEL
+        area_malla_total = area_total_trabajo * 2
+        paneles_malla = math.ceil(area_malla_total / AREA_PANEL_MALLA)
 
-        desc = "Cápsula compacta (3.5cm espesor). Alta resistencia estructural." if largo == 3 else "Suite profunda tipo túnel. Estructura liviana sismorresistente."
+        desc = "Cápsula compacta (3.5cm espesor). Alta resistencia." if largo == 3 else "Suite profunda tipo túnel. Sismorresistente."
         
         lista = {
             'info_nombre': f"Bóveda Glamping ({largo}m)", 'info_desc': desc,
             'info_area': round(area_piso, 1), 'info_altura': 2.8,
             'cemento': cemento_bov, 
             'arena': round(volumen_mortero * 1.1, 1),
-            'malla': paneles_malla, 
+            'malla': paneles_malla, # Paneles corregidos
             'varillas': int(largo * 3), 
             'alambron': int(cemento_bov * 0.3), 
             'tubos': 3
         }
-        # Mano de obra un poco más barata que tanque (menos riesgo hidráulico)
         costo_extra = (area_total_trabajo * PRECIOS['mo_m2_boveda']) + PRECIOS['kit_impermeabilizante'] + PRECIOS['kit_fachada_boveda']
 
     # CÁLCULO FINAL PRECIO
@@ -168,7 +155,6 @@ st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural
 # --- MENÚ LATERAL ---
 st.sidebar.header("🛠️ Configurador de Proyectos")
 
-# DEFINIMOS LOS NOMBRES EN VARIABLES
 OPCION_CASAS = "🏠 Casas Modulares"
 OPCION_ESTANQUES = "🐟 Estanques Piscícolas"
 OPCION_BOVEDAS = "⛺ Bóvedas Glamping"
@@ -207,18 +193,14 @@ if datos:
     st.markdown(f'<p class="big-font">{datos["nombre"]}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-font">{datos["descripcion"]}</p>', unsafe_allow_html=True)
 
-    # --- CÁLCULO DE TIEMPOS DINÁMICO ---
+    # --- TIEMPOS ---
     tiempo_entrega = "Consultar"
-    
     if categoria == OPCION_CASAS:
         if modelo_seleccionado == 1: tiempo_entrega = "30 - 45 Días"
         elif modelo_seleccionado == 2: tiempo_entrega = "45 - 60 Días"
         elif modelo_seleccionado == 3: tiempo_entrega = "75 - 90 Días"
-    
-    elif categoria == OPCION_ESTANQUES: 
-        tiempo_entrega = "10 - 15 Días"
-    elif categoria == OPCION_BOVEDAS: 
-        tiempo_entrega = "15 - 20 Días"
+    elif categoria == OPCION_ESTANQUES: tiempo_entrega = "10 - 15 Días"
+    elif categoria == OPCION_BOVEDAS: tiempo_entrega = "15 - 20 Días"
 
     # Métricas
     c1, c2, c3 = st.columns(3)
@@ -240,16 +222,13 @@ if datos:
         col_text, col_visual = st.columns([1, 1.5])
         with col_text:
             if categoria == OPCION_CASAS:
-                if modelo == 1: st.write("Diseño Loft abierto para parejas.")
-                elif modelo == 2: st.write("Diseño familiar con separación de ambientes.")
-                elif modelo == 3: st.write("Gran casa tipo Hacienda con techos altos.")
+                st.write(f"Diseño optimizado Modelo {modelo_seleccionado}.")
             elif categoria == OPCION_BOVEDAS:
-                st.write(f"Bóveda de ferrocemento de {dimension_seleccionada}m de profundidad. Ideal para Glamping.")
+                st.write(f"Bóveda de ferrocemento de {dimension_seleccionada}m. Diseño Sismorresistente.")
             elif categoria == OPCION_ESTANQUES:
                 st.write("Tanque circular de alta producción en ferrocemento.")
 
         with col_visual:
-            # Búsqueda de IMAGEN INTELIGENTE (PNG/JPG)
             img_name = ""
             if categoria == OPCION_CASAS: img_name = f"render_modelo{modelo_seleccionado}"
             elif categoria == OPCION_BOVEDAS: img_name = f"render_boveda{dimension_seleccionada}"
@@ -263,16 +242,13 @@ if datos:
                     found = True
                     break
             if not found:
-                st.info(f"Falta imagen: {img_name} (.png/.jpg)")
+                st.info(f"Falta imagen: {img_name}")
 
-            # PLANO (Solo casas y bóvedas)
             if categoria != OPCION_ESTANQUES:
                 st.caption("📐 Esquema de Distribución")
                 try:
-                    svg_plano = core_planos.dibujar_planta(1) 
-                    st.markdown(svg_plano, unsafe_allow_html=True)
-                except:
-                    st.error("Error cargando el plano.")
+                    st.markdown(core_planos.dibujar_planta(1), unsafe_allow_html=True)
+                except: pass
 
     # 2. FINANCIERA
     with tab2:

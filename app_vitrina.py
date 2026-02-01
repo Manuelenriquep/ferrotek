@@ -16,8 +16,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CORRECCIÓN AQUÍ ---
-# Se cambió 'use_column_width' por 'use_container_width'
+# --- CORRECCIÓN 1: Banner sin advertencia roja ---
 st.image("https://via.placeholder.com/800x200.png?text=FERROTEK+Ingenieria+Rural", use_container_width=True)
 
 # --- MENÚ LATERAL ---
@@ -65,7 +64,7 @@ if datos:
     # PESTAÑAS
     tab1, tab2, tab3 = st.tabs(["📐 Distribución", "💰 Inversión", "🛒 Materiales"])
 
-    # 1. PESTAÑA DISEÑO (Aquí aparecen los PLANOS)
+    # 1. PESTAÑA DISEÑO
     with tab1:
         if categoria == "🏠 Casas Modulares":
             col_text, col_plan = st.columns([1, 1.5])
@@ -78,8 +77,9 @@ if datos:
                     st.markdown("**Concepto Hacienda:**\nGran salón central (40m2) y alas independientes.")
             
             with col_plan:
-                # DIBUJO DEL PLANO SVG
+                # --- CORRECCIÓN 2: DIBUJAR EL PLANO (No mostrar texto) ---
                 svg_plano = core_planos.dibujar_planta(modelo_seleccionado)
+                # La clave es 'unsafe_allow_html=True'
                 st.markdown(svg_plano, unsafe_allow_html=True) 
                 st.caption("Distribución Arquitectónica Optimizada")
         

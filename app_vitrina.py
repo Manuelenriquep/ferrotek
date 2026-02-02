@@ -117,9 +117,9 @@ elif st.session_state.view == 'muros':
         st.write("#### Textura Real 'Piel de Roca'")
         # ATENCIÓN: Verifica que este nombre sea exacto en tu repo
         try:
-            st.image("image_4.png", caption="Acabado natural tras 12h de lluvia.")
+            st.image("image_4.jpg", caption="Acabado natural tras 12h de lluvia.")
         except:
-            st.error("⚠️ Error: No se encuentra 'image_4.png' en el repositorio.")
+            st.error("⚠️ Error: No se encuentra 'image_4.jpg' en el repositorio.")
 
 # ==========================================
 # 🎨 VISTA 3: VIVIENDAS (CORREGIDA CON TUS NOMBRES)

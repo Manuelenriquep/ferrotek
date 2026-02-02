@@ -1,56 +1,61 @@
-def dibujar_planta(modelo):
-    # Definición de Colores
-    c_muro = "#2C3E50"    
-    c_social = "#FCF3CF"  
-    c_hab = "#D5F5E3"     
-    c_bano = "#D6EAF8"    
-    c_cocina = "#FAD7A0"  
-    
-    # 1. Definir dimensiones
-    if modelo == 1: w, h = 5, 7
-    elif modelo == 2: w, h = 5, 13
-    elif modelo == 3: w, h = 10, 11
-    else: w, h = 5, 5
-    
-    # Usaremos una lista para guardar las partes del dibujo de forma segura
-    svg_parts = []
-    
-    # 2. AGREGAR LA ETIQUETA DE APERTURA (Vital)
-    svg_parts.append(f'<svg width="100%" height="{h*45}" viewBox="0 0 {w*40} {h*40}" xmlns="http://www.w3.org/2000/svg">')
-    
-    # Función auxiliar rectángulos
-    def rect(x, y, w_rect, h_rect, color, texto, subtexto=""):
-        scale = 40 
-        rx, ry, rw, rh = x*scale, y*scale, w_rect*scale, h_rect*scale
-        font_s = "14" if w_rect > 1.5 else "11"
-        # Devolvemos el bloque de texto sin espacios extra al inicio
-        return f"""<g><rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" style="fill:{color};stroke:{c_muro};stroke-width:2;fill-opacity:0.9" /><text x="{rx + rw/2}" y="{ry + rh/2 - 7}" font-family="sans-serif" font-size="{font_s}" fill="{c_muro}" font-weight="bold" text-anchor="middle">{texto}</text><text x="{rx + rw/2}" y="{ry + rh/2 + 10}" font-family="sans-serif" font-size="10" fill="#555" text-anchor="middle">{subtexto}</text></g>"""
+import math
 
-    # 3. AGREGAR LAS PARTES SEGÚN EL MODELO
-    if modelo == 1: 
-        svg_parts.append(rect(0, 0, 5, 1.5, c_cocina, "COCINA / ACCESO", "Kitchenette"))
-        svg_parts.append(rect(0, 1.5, 5, 3.5, "#FFFFFF", "CAMA KING", "Vista Panorámica"))
-        svg_parts.append(rect(0, 5, 5, 2, c_bano, "BAÑO / VESTIER", "Oculto tras cabecero"))
-
-    elif modelo == 2: 
-        svg_parts.append(rect(0, 0, 5, 5, c_social, "SALA - COMEDOR", "Cocina Abierta"))
-        svg_parts.append(rect(1.5, 5, 2, 4, "#EAEDED", "PASILLO", "Circulación"))
-        svg_parts.append(rect(0, 5, 1.5, 2.5, c_bano, "BAÑO", "Social"))
-        svg_parts.append(rect(3.5, 5, 1.5, 2.5, "#E8DAEF", "ESTUDIO", "Lavado"))
-        svg_parts.append(rect(0, 9, 2.5, 4, c_hab, "HABITACIÓN 1", "3.00 x 2.50"))
-        svg_parts.append(rect(2.5, 9, 2.5, 4, c_hab, "HABITACIÓN 2", "3.00 x 2.50"))
-
-    elif modelo == 3: 
-        svg_parts.append(rect(0, 0, 3, 6, "#E8DAEF", "MASTER SUITE", "Principal"))
-        svg_parts.append(rect(0, 6, 3, 5, c_bano, "BAÑO / VESTIER", "Privado"))
-        svg_parts.append(rect(3, 0, 4, 7, c_social, "GRAN SALÓN", "Techo Alto"))
-        svg_parts.append(rect(3, 7, 4, 4, c_cocina, "COCINA ISLA", "Comedor"))
-        svg_parts.append(rect(7, 0, 3, 4, c_hab, "HABITACIÓN 2", "Auxiliar"))
-        svg_parts.append(rect(7, 4, 3, 3, c_bano, "BAÑO", "Compartido"))
-        svg_parts.append(rect(7, 7, 3, 4, c_hab, "HABITACIÓN 3", "Auxiliar"))
-
-    # 4. AGREGAR ETIQUETA DE CIERRE
-    svg_parts.append("</svg>")
+class CoreFerrotek:
+    """
+    Núcleo de Ingeniería Ferrotek v56.0
+    Basado en 20 años de investigación en morteros y estructuras Unibody.
+    """
     
-    # Unir todas las partes en un solo texto limpio
-    return "\n".join(svg_parts)
+    def __init__(self, precios):
+        self.p = precios # Recibe el diccionario de precios desde la DB
+        self.H_VISTA = 2.20
+        self.H_MALLA = 2.35
+        self.ZAPATA_RAIZ = 0.15 # 15cm excedentes para enterrar
+
+    def calcular_cerramiento_perimetral(self, ml):
+        """Muro de Cerramiento con Sistema Raíz y Matriz 1:3:3"""
+        # Estructura: Postes de 2" cada 1.50m
+        cant_postes = math.ceil(ml / 1.5) + 1
+        mts_perfil = cant_postes * (self.H_VISTA + 0.6) # Incluye dado de concreto
+        costo_acero = mts_perfil * self.p['perfil_2_pulg_mt']
+        
+        # Blindaje: Malla 5mm + Zaranda (Simple Membrana para cerramiento)
+        area_malla = ml * self.H_MALLA
+        costo_mallas = (area_malla * self.p['malla_5mm_m2']) + (area_malla * 2 * self.p['malla_zaranda_m2'])
+        
+        # Matriz: 1 Cemento, 3 Arena, 3 Cal (4cm espesor)
+        vol_mezcla = (ml * self.H_VISTA * 0.04) * 1.10 # 10% desperdicio
+        costo_mezcla = vol_mezcla * (5 * self.p['cemento_bulto'] + 5 * self.p['cal_bulto'] + self.p['arena_m3'])
+        
+        # Mano de Obra: Rendimiento industrializado
+        costo_mo = (ml * 0.8) * self.p['valor_jornal']
+        
+        directo = costo_acero + costo_mallas + costo_mezcla + costo_mo
+        return {"total": directo, "ml": directo/ml, "postes": cant_postes}
+
+    def calcular_muros_vivienda(self, perimetro_ext, divisiones_int):
+        """Lógica Unificada: Fachada (Doble Membrana) vs Internos (Simple)"""
+        
+        # 1. FACHADAS (Doble Membrana - Confort Térmico)
+        area_ext = perimetro_ext * self.H_VISTA
+        mallas_ext = area_ext * (self.p['malla_5mm_m2'] + 2 * self.p['malla_zaranda_m2'])
+        mortero_ext = (area_ext * 0.05) * (5 * self.p['cemento_bulto'] + 5 * self.p['cal_bulto'] + self.p['arena_m3'])
+        
+        # 2. INTERNOS (Membrana Simple - Ganancia de Área)
+        area_int = divisiones_int * self.H_VISTA
+        mallas_int = area_int * (self.p['malla_5mm_m2'] + self.p['malla_zaranda_m2'])
+        mortero_int = (area_int * 0.035) * (5 * self.p['cemento_bulto'] + 5 * self.p['cal_bulto'] + self.p['arena_m3'])
+        
+        # 3. ESTRUCTURA COMPLETA (Postes 2" @ 1.5m)
+        cant_postes = math.ceil((perimetro_ext + divisiones_int) / 1.5)
+        costo_acero = (cant_postes * 3.0) * self.p['perfil_2_pulg_mt']
+        
+        total_muros = mallas_ext + mortero_ext + mallas_int + mortero_int + costo_acero
+        return total_muros
+
+    def calcular_piso_polimerico(self, area_m2):
+        """Matriz 2:1 con Polímeros y Sellado en Poliuretano"""
+        # Cemento rico + Aditivo F1 + Sellado FX
+        costo_quimicos = area_m2 * (0.25 * self.p['aditivo_F1_kg'] + 0.12 * self.p['sellado_FX_galon'])
+        vol_mezcla = (area_m2 * 0.05) * (10 * self.p['cemento_bulto'] + self.p['arena_m3'])
+        return costo_quimicos + vol_mezcla

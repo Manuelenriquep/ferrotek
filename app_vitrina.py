@@ -72,7 +72,7 @@ elif st.session_state.view == 'muros':
     st.write("**Sistema:** Postes 2\" @ 1.5m + Malla 5mm + Matriz 1:3:3.")
 
 # ==========================================
-# 🎨 VISTA 3: VIVIENDAS (NUEVA!)
+# 🎨 VISTA 3: VIVIENDAS (CORREGIDA)
 # ==========================================
 elif st.session_state.view == 'viviendas':
     st.button("⬅️ Volver al Menú", on_click=lambda: set_view('home'))
@@ -81,8 +81,8 @@ elif st.session_state.view == 'viviendas':
     opcion = st.radio("Seleccione Tamaño:", ["Suite (30m²)", "Familiar (54m²)", "Máster (84m²)"], horizontal=True)
     m2 = 30 if "30" in opcion else (54 if "54" in opcion else 84)
     
-    # Cálculo con doble membrana exterior y simple interior
-    costo_m2 = 980000 # Promedio llave en mano
+    # Cálculo base
+    costo_m2 = 980000 
     total = m2 * costo_m2
     
     col_a, col_b = st.columns(2)
@@ -92,7 +92,18 @@ elif st.session_state.view == 'viviendas':
         st.write("- Fachadas en **Doble Membrana**.")
         st.write("- Muros internos en **Membrana Simple**.")
         st.write("- Pisos en **Matriz 2:1 + Polímeros**.")
+    
     with col_b:
+        st.write("### 📐 Detalle Constructivo")
+        # Aquí es donde estaba el error de indentación, ahora tiene contenido:
+        st.write("El sistema Unibody garantiza que la estructura sea una sola pieza ligada por el sándwich de malla 5mm.")
+        
+
+# ==========================================
+# 🎨 VISTA 4: ESPECIALES (SIGUIENTE BLOQUE)
+# ==========================================
+elif st.session_state.view == 'especiales':
+    # ... resto del código
         
 
 # ==========================================

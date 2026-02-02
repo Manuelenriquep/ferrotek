@@ -12,35 +12,41 @@ with st.sidebar:
     pwd = st.text_input("Contraseña:", type="password")
     if pwd == st.session_state.get('db', {}).get('config', {}).get('admin_pass', 'ferrotek2026'):
         st.success("Acceso Concedido - Modo Edición")
-        st.markdown("### 💲 Ajuste de Precios Base")
+        st.markdown("### 💲 Base de Precios Unitaria")
+        st.info("Edite los valores según el mercado actual:")
+        
+        # Editor de datos con claves claras
         if 'db' in st.session_state:
-             new_prices = st.data_editor(st.session_state['db']['precios'], num_rows="fixed")
+             new_prices = st.data_editor(
+                 st.session_state['db']['precios'], 
+                 num_rows="fixed",
+                 use_container_width=True
+             )
              st.session_state['db']['precios'] = new_prices
-             st.toast("¡Precios actualizados en caliente!", icon="✅")
+             st.toast("¡Precios guardados!", icon="✅")
     else:
         st.caption("Área restringida para dirección Ferrotek.")
     
     st.divider()
-    # Contacto legal se mantiene aquí, discreto
-    st.markdown("### ⚖️ Contacto Jurídico")
+    st.markdown("### ⚖️ Contacto Administrativo")
     st.markdown("**Manuel E. Prada Forero**\nTP: 176.633 CSJ")
 
 
-# Inicialización de la DB
+# Inicialización de la DB con UNIDADES EXACTAS
 if 'db' not in st.session_state:
     st.session_state['db'] = {
         "config": {"margen_utilidad": 0.30, "admin_pass": "ferrotek2026"},
         "precios": {
-            'perfil_2_pulg_mt': 12500,
-            'perfil_c18_mt': 11500,
-            'malla_5mm_m2': 28000,
-            'malla_zaranda_m2': 8500,
-            'cemento_bulto': 29500,
-            'cal_bulto': 18500,
-            'arena_m3': 98000,
-            'aditivo_F1_kg': 48000,
-            'sellado_FX_galon': 195000,
-            'valor_jornal': 125000
+            'perfil_2_pulg_cal18_ml': 12500,  # Metro lineal
+            'perfil_c18_ml': 11500,           # Metro lineal
+            'malla_5mm_m2': 28000,            # Metro cuadrado
+            'malla_zaranda_m2': 8500,         # Metro cuadrado
+            'cemento_gris_50kg': 29500,       # Bulto 50kg
+            'cal_hidratada_10kg': 18500,      # Bulto 10kg
+            'arena_rio_m3': 98000,            # Metro cúbico
+            'aditivo_F1_kg': 48000,           # Kilo
+            'sellado_FX_galon': 195000,       # Galón
+            'valor_jornal_dia': 125000        # Día hombre
         }
     }
 
@@ -51,9 +57,10 @@ def set_view(name):
     st.session_state.view = name
 
 # ==========================================
-# 🧠 MOTOR DE LOGÍSTICA (BULTOS DE 30KG)
+# 🧠 MOTOR DE LOGÍSTICA (BULTOS FERROTEK 30KG)
 # ==========================================
 def calcular_bultos(area_m2, espesor_cm=4):
+    # Un bulto de 30kg produce aprox 16 litros de mezcla húmeda
     volumen_litros = area_m2 * espesor_cm * 10
     total_bultos = math.ceil(volumen_litros / 16)
     return math.ceil(total_bultos * 0.7), math.ceil(total_bultos * 0.3)
@@ -67,9 +74,9 @@ if st.session_state.view == 'home':
     
     with st.expander("💡 ¿Qué es la Tecnología Unibody Ferrotek? (Leer más)"):
         st.markdown("""
-        A diferencia de la construcción tradicional, **Ferrotek crea una sola pieza monolítica** sismo-resistente.
+        **Ferrotek crea una sola pieza monolítica** sismo-resistente.
         * **Alma de Acero:** Malla electrosoldada de 5mm.
-        * **Piel de Roca:** Morteros de alta densidad que no necesitan pintura.
+        * **Piel de Roca:** Morteros de alta densidad (Arena seleccionada + Cemento 50kg + Cal).
         * **Eficiencia:** Más rápido y resistente que el bloque.
         """)
     st.write("---")
@@ -115,20 +122,18 @@ elif st.session_state.view == 'muros':
 
     with c2:
         st.write("#### Textura Real 'Piel de Roca'")
-        # ATENCIÓN: Verifica que este nombre sea exacto en tu repo
         try:
-            st.image("image_4.jpg", caption="Acabado natural tras 12h de lluvia.")
+            st.image("image_4.png", caption="Acabado natural tras 12h de lluvia.")
         except:
-            st.error("⚠️ Error: No se encuentra 'image_4.jpg' en el repositorio.")
+            st.error("⚠️ Error: No se encuentra 'image_4.png'.")
 
 # ==========================================
-# 🎨 VISTA 3: VIVIENDAS (CORREGIDA CON TUS NOMBRES)
+# 🎨 VISTA 3: VIVIENDAS
 # ==========================================
 elif st.session_state.view == 'viviendas':
     st.button("⬅️ Menú Principal", on_click=lambda: set_view('home'))
     st.header("🏠 Viviendas Unibody (Llave en Mano)")
     
-    # --- CORRECCIÓN DE NOMBRES AQUÍ ---
     fotos_casas = {
         "Suite (30m²)": "render_modelo1.png",
         "Familiar (54m²)": "render_modelo2.png", 
@@ -158,7 +163,7 @@ elif st.session_state.view == 'viviendas':
         try:
             st.image(foto_actual, use_column_width=True)
         except:
-            st.error(f"⚠️ Error: No se encuentra '{foto_actual}' en el repositorio. Verifique el nombre exacto.")
+            st.error(f"⚠️ Error: No se encuentra '{foto_actual}' en el repositorio.")
 
 # ==========================================
 # 🎨 VISTA 4: ESPECIALES
@@ -178,11 +183,10 @@ elif st.session_state.view == 'especiales':
              st.write("### ⚙️ Ingeniería de Arco:")
              st.write("Nace de **Perfil C Calibre 18** (primeros 90cm) con proyección de arcos de varilla y malla.")
         with c_esp2:
-             # ATENCIÓN: Verifica este nombre también
              try:
                 st.image("image_15.png", caption="Potencial de acabado Bóveda", use_column_width=True)
              except:
-                 st.error("⚠️ Error: No se encuentra 'image_15.png' en el repositorio.")
+                 st.error("⚠️ Error: No se encuentra 'image_15.png'.")
                  
     with t2:
         st.subheader("Piscicultura de Alta Densidad")
@@ -191,7 +195,7 @@ elif st.session_state.view == 'especiales':
         st.write("Tanques de una sola pieza, sin filtraciones.")
 
 # ==========================================
-# ⚖️ FOOTER CORPORATIVO (LIMPIO)
+# ⚖️ FOOTER CORPORATIVO
 # ==========================================
 st.divider()
 st.caption("© 2026 FERROTEK Ingeniería Unibody | Floridablanca, Santander, Colombia")

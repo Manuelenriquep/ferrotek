@@ -4,78 +4,91 @@ import math
 import json
 import urllib.parse
 
-st.set_page_config(page_title="Ferrotek | Industrialized Systems", page_icon="🏭", layout="wide")
+st.set_page_config(page_title="Ferrotek | Exclusividad Unibody", page_icon="🏗️", layout="wide")
 
 # ==========================================
-# 💾 PERSISTENCIA (Sincronizada)
+# 💾 DB - Nombres de Insumos "Codificados" para el Cliente
 # ==========================================
 ARCHIVO_DB = 'ferrotek_db.json'
 def cargar_db():
     if not os.path.exists(ARCHIVO_DB):
         return {"config": {"margen_utilidad": 0.35, "admin_pass": "ferrotek2026"},
                 "precios": {'acero_estructural_kg': 7200, 'acero_comercial_kg': 5800, 'cemento': 29500, 
-                           'arena': 98000, 'triturado': 118000, 'malla_electro': 225000, 
-                           'valor_jornal_dia': 125000, 'kit_starlink': 2200000}}
+                           'arena': 98000, 'valor_jornal_dia': 125000, 'punto_electrico': 40000, 
+                           'punto_hidraulico': 120000, 'aditivo_F1_kg': 48000, # Nombre codificado
+                           'sellado_FX_galon': 195000, 'acometida_base': 1200000}}
     with open(ARCHIVO_DB, 'r') as f: return json.load(f)
 
 if 'db' not in st.session_state: st.session_state['db'] = cargar_db()
 
 # ==========================================
-# 🧠 MOTOR DE PRODUCTIVIDAD INDUSTRIAL
+# 🧠 CÁLCULOS PRIVADOS
 # ==========================================
 PORTAFOLIO = {
-    "Vivienda 1 Alcoba (30m²)": {"area": 30, "perim": 24, "jornales": 65, "cat": "Vivienda"},
-    "Vivienda 2 Alcobas (54m²)": {"area": 54, "perim": 32, "jornales": 105, "cat": "Vivienda"},
-    "Vivienda 3 Alcobas (84m²)": {"area": 84, "perim": 40, "jornales": 155, "cat": "Vivienda"},
-    "Vivienda Interés Social (72m²)": {"area": 72, "perim": 36, "jornales": 135, "cat": "Vivienda"},
-    "Máster Unibody (100m²)": {"area": 100, "perim": 44, "jornales": 185, "cat": "Vivienda"},
-    "Bóveda / Domo Geodésico": {"area": 25, "perim": 18, "jornales": 55, "cat": "Especial"},
-    "Estanque Piscícola (20m³)": {"area": 32, "perim": 16, "jornales": 35, "cat": "Estanque"},
-    "Muro Perimetral (metro lineal)": {"area": 2.5, "perim": 1, "jornales": 3, "cat": "Muro"}
+    "Vivienda 1 Alcoba (30m²)": {"area": 30, "perim": 24, "esp": 3, "j": 70},
+    "Vivienda 2 Alcobas (54m²)": {"area": 54, "perim": 32, "esp": 5, "j": 115},
+    "Vivienda 3 Alcobas (84m²)": {"area": 84, "perim": 40, "esp": 7, "j": 165},
+    "Máster Unibody (100m²)": {"area": 100, "perim": 44, "esp": 8, "j": 200}
 }
 
-def calcular_industrial(item, db, ext):
+def cotizar_blindado(item, db):
     p = db['precios']
     m = PORTAFOLIO[item]
-    # Cálculo de Insumos Estándar
-    c_mat = (math.ceil((m['perim']/0.40)/2)+6)*9.5*(p['acero_estructural_kg'] if ext.get('p2') else p['acero_comercial_kg'])
-    c_mat += (int(((m['area']*0.10)+(m['perim']*2.4*0.05))*9.5)*p['cemento'])
-    c_mo = m['jornales'] * p['valor_jornal_dia']
-    precio = (c_mat + c_mo) / (1 - db['config']['margen_utilidad'])
-    return {"precio": round(precio, -3), "costo_directo": c_mat + c_mo, "eficiencia": round(m['area']/m['jornales'], 2)}
+    # Cálculos internos (basados en tu investigación de 20 años)
+    c_base = (math.ceil((m['perim']/0.4)+6)*9.5*p['acero_comercial_kg']) + (int(((m['area']*0.12)+(m['perim']*2.4*0.05))*9.5)*p['cemento'])
+    c_quimicos = (m['area'] * 0.2 * p['aditivo_F1_kg']) + (m['area'] / 12 * p['sellado_FX_galon'])
+    c_inst = (m['esp'] * 3 * p['punto_electrico']) + p['acometida_base'] + (5 * p['punto_hidraulico'])
+    costo = c_base + c_quimicos + c_inst + (m['j'] * p['valor_jornal_dia'])
+    return {"precio": round(costo / (1 - db['config']['margen_utilidad']), -3), "area_g": round(m['perim']*0.1, 1)}
 
 # ==========================================
-# 🎨 INTERFAZ
+# 🎨 INTERFAZ ESTRATÉGICA
 # ==========================================
-st.sidebar.title("🏗️ FERROTEK INDUSTRIAL")
-sel = st.sidebar.selectbox("Seleccione Prototipo:", list(PORTAFOLIO.keys()))
-p2 = st.sidebar.checkbox("Refuerzo Multinivel")
-res = calcular_industrial(sel, st.session_state['db'], {'p2': p2})
+t_home, t_quote, t_admin = st.tabs(["💎 EL SISTEMA FERROTEK", "📊 ESTUDIO DE INVERSIÓN", "🔑 PANEL DIRECTOR"])
 
-t1, t2, t3 = st.tabs(["📊 Propuesta Ejecutiva", "🔬 Ficha de Proceso", "🔑 Control de Planta"])
-
-with t1:
-    st.header(sel)
-    st.metric("INVERSIÓN SISTEMA LLAVE EN MANO", f"${res['precio']:,.0f}")
-    st.write("---")
-    st.write("### 💎 Por qué es un Sistema Industrializado:")
-    st.write("- **Precisión:** Estructuras pre-calculadas que eliminan el error humano.")
-    st.write("- **Velocidad:** Reducción del 40% en tiempos de obra frente a mampostería.")
-    st.write("- **Sostenibilidad:** Cero escombros y desperdicio de materiales optimizado.")
+with t_home:
+    st.title("🏗️ FERROTEK: Vivienda Monocasco de Alta Tecnología")
+    st.write("### 🛡️ Respaldado por 20 años de investigación en Ciencia de Materiales")
     
-    wa = f"https://wa.me/573012428215?text=Interes%20Prototipo%20{sel}"
-    st.markdown(f'<a href="{wa}" target="_blank"><button style="width:100%; background-color:#1E3A8A; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer;">INICIAR PROCESO DE VALIDACIÓN</button></a>', unsafe_allow_html=True)
+    st.markdown("""
+    Nuestro sistema no se 'construye', se **manufactura** bajo estándares de ingeniería avanzada que superan por 
+    completo la mampostería tradicional.
+    """)
 
-with t2:
-    st.subheader("Flujo de Manufactura en Sitio")
-    st.write("1. **Anclaje:** Fijación de bases sobre cimentación técnica.")
-    st.write("2. **Armado:** Montaje de esqueleto Steel Framing Unibody.")
-    st.write("3. **Blindaje:** Aplicación de Piel de Roca de Alta Densidad.")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.info("### 📐 Recuperación Espacial")
+        st.write("La eficiencia de nuestra **Piel de Roca Unibody** le otorga hasta un 10% más de área libre que una casa de ladrillo. No pague por muros gruesos y obsoletos.")
+        
+        
+    with c2:
+        st.success("### 🧪 Matriz Polimérica F1")
+        st.write("Utilizamos una aleación cementicia modificada con polímeros de alta densidad. El resultado: superficies elásticas, impermeables y de mantenimiento cero.")
+        
+        
+    with c3:
+        st.warning("### ⏱️ Ciclos de Manufactura")
+        st.write("Reducimos el tiempo de entrega en un 40%. Un sistema industrializado en sitio que garantiza precisión milimétrica y sismo-resistencia superior.")
+
+with t_quote:
+    sel = st.selectbox("Seleccione Prototipo para Análisis de Inversión:", list(PORTAFOLIO.keys()))
+    res = cotizar_blindado(sel, st.session_state['db'])
     
+    col1, col2 = st.columns(2)
+    col1.metric("VALOR TOTAL DEL PROYECTO", f"${res['precio']:,.0f}")
+    col2.metric("ÁREA EXTRA GANADA", f"{res['area_g']} m²")
+    
+    st.divider()
+    st.write("⚠️ *La composición exacta de la **Matriz Ferrotek F1** es propiedad intelectual de la compañía y solo se aplica bajo supervisión técnica autorizada.*")
+    
+    msg = f"Deseo una validación técnica para el modelo {sel} de Ferrotek."
+    st.markdown(f'<a href="https://wa.me/573012428215?text={urllib.parse.quote(msg)}" target="_blank"><button style="width:100%; background-color:#1E3A8A; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer;">🟢 CONTACTAR DIRECTOR TÉCNICO</button></a>', unsafe_allow_html=True)
 
-with t3:
-    psw = st.text_input("Acceso Director:", type="password")
+with t_admin:
+    psw = st.text_input("Acceso de Seguridad:", type="password")
     if psw == st.session_state['db']['config']['admin_pass']:
-        st.write(f"**Costo Directo:** ${res['costo_directo']:,.0f}")
-        st.write(f"**Índice de Productividad:** {res['eficiencia']} m²/jornal")
-        st.info("💡 Este índice mide cuántos m² construye un operario por día. ¡Optimízalo!")
+        st.write("### Gestión de Insumos Críticos")
+        st.data_editor(st.session_state['db']['precios'])
+        if st.button("Guardar"):
+            with open(ARCHIVO_DB, 'w') as f: json.dump(st.session_state['db'], f)
+            st.success("Base de datos sincronizada.")

@@ -4,106 +4,78 @@ import math
 import json
 import urllib.parse
 
-st.set_page_config(page_title="Ferrotek Master Portfolio", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="Ferrotek | Industrialized Systems", page_icon="🏭", layout="wide")
 
 # ==========================================
-# 💾 PERSISTENCIA Y PRECIOS
+# 💾 PERSISTENCIA (Sincronizada)
 # ==========================================
 ARCHIVO_DB = 'ferrotek_db.json'
-DB_INICIAL = {
-    "config": {"margen_utilidad": 0.30, "admin_pass": "ferrotek2026"},
-    "precios": {
-        'acero_estructural_kg': 7200, 'acero_comercial_kg': 5500,
-        'cemento': 28500, 'arena': 95000, 'triturado': 115000,
-        'malla_electro': 215000, 'malla_zaranda': 285000,
-        'valor_jornal_dia': 110000, 'kit_starlink': 2200000
-    }
-}
-
 def cargar_db():
     if not os.path.exists(ARCHIVO_DB):
-        with open(ARCHIVO_DB, 'w') as f: json.dump(DB_INICIAL, f)
-        return DB_INICIAL
+        return {"config": {"margen_utilidad": 0.35, "admin_pass": "ferrotek2026"},
+                "precios": {'acero_estructural_kg': 7200, 'acero_comercial_kg': 5800, 'cemento': 29500, 
+                           'arena': 98000, 'triturado': 118000, 'malla_electro': 225000, 
+                           'valor_jornal_dia': 125000, 'kit_starlink': 2200000}}
     with open(ARCHIVO_DB, 'r') as f: return json.load(f)
 
 if 'db' not in st.session_state: st.session_state['db'] = cargar_db()
 
 # ==========================================
-# 🧠 DICCIONARIO MAESTRO DE PORTAFOLIO
+# 🧠 MOTOR DE PRODUCTIVIDAD INDUSTRIAL
 # ==========================================
 PORTAFOLIO = {
-    "Vivienda 1 Alcoba (30m²)": {"area": 30, "perim": 22, "jornales": 50, "tipo": "Vivienda"},
-    "Vivienda 2 Alcobas (54m²)": {"area": 54, "perim": 30, "jornales": 90, "tipo": "Vivienda"},
-    "Vivienda 3 Alcobas (84m²)": {"area": 84, "perim": 38, "jornales": 140, "tipo": "Vivienda"},
-    "Vivienda Interés Social (72m²)": {"area": 72, "perim": 36, "jornales": 120, "tipo": "Vivienda"},
-    "Máster Unibody (100m²)": {"area": 100, "perim": 40, "jornales": 160, "tipo": "Vivienda"},
-    "Bóveda / Domo Geodésico": {"area": 25, "perim": 18, "jornales": 40, "tipo": "Especial"},
-    "Estanque Piscícola (20m³)": {"area": 32, "perim": 16, "jornales": 25, "tipo": "Estanque"},
-    "Muro Perimetral (metro lineal)": {"area": 2.5, "perim": 1, "jornales": 2, "tipo": "Muro"}
+    "Vivienda 1 Alcoba (30m²)": {"area": 30, "perim": 24, "jornales": 65, "cat": "Vivienda"},
+    "Vivienda 2 Alcobas (54m²)": {"area": 54, "perim": 32, "jornales": 105, "cat": "Vivienda"},
+    "Vivienda 3 Alcobas (84m²)": {"area": 84, "perim": 40, "jornales": 155, "cat": "Vivienda"},
+    "Vivienda Interés Social (72m²)": {"area": 72, "perim": 36, "jornales": 135, "cat": "Vivienda"},
+    "Máster Unibody (100m²)": {"area": 100, "perim": 44, "jornales": 185, "cat": "Vivienda"},
+    "Bóveda / Domo Geodésico": {"area": 25, "perim": 18, "jornales": 55, "cat": "Especial"},
+    "Estanque Piscícola (20m³)": {"area": 32, "perim": 16, "jornales": 35, "cat": "Estanque"},
+    "Muro Perimetral (metro lineal)": {"area": 2.5, "perim": 1, "jornales": 3, "cat": "Muro"}
 }
 
-def calcular_portafolio(item, db, ext):
+def calcular_industrial(item, db, ext):
     p = db['precios']
     m = PORTAFOLIO[item]
-    
-    # Lógica de materiales optimizada
-    p_acero = p['acero_estructural_kg'] if ext.get('piso2') else p['acero_comercial_kg']
-    cant_c = math.ceil((m['perim']/0.50)/2) + 4
-    vol_mort = (m['area']*0.08) + (m['perim']*2.4*0.05)
-    cem = int(vol_mort * 8.5)
-    
-    # Costos
-    c_mat = (cant_c * 9 * p_acero) + (cem * p['cemento']) + (vol_mort * p['arena'])
-    if ext.get('wifi'): c_mat += p['kit_starlink']
+    # Cálculo de Insumos Estándar
+    c_mat = (math.ceil((m['perim']/0.40)/2)+6)*9.5*(p['acero_estructural_kg'] if ext.get('p2') else p['acero_comercial_kg'])
+    c_mat += (int(((m['area']*0.10)+(m['perim']*2.4*0.05))*9.5)*p['cemento'])
     c_mo = m['jornales'] * p['valor_jornal_dia']
-    
-    precio_venta = (c_mat + c_mo) / (1 - db['config']['margen_utilidad'])
-    return {"precio": round(precio_venta, -3), "mat_detalle": [cant_c, cem, round(vol_mort,1)], "c_base": c_mat+c_mo}
+    precio = (c_mat + c_mo) / (1 - db['config']['margen_utilidad'])
+    return {"precio": round(precio, -3), "costo_directo": c_mat + c_mo, "eficiencia": round(m['area']/m['jornales'], 2)}
 
 # ==========================================
-# 🎨 INTERFAZ UNIFICADA
+# 🎨 INTERFAZ
 # ==========================================
-st.sidebar.title("🛠️ FERROTEK.GUANES.BIZ")
-categoria = st.sidebar.radio("Filtrar Portafolio:", ["Todo", "Vivienda", "Especial", "Estanque", "Muro"])
+st.sidebar.title("🏗️ FERROTEK INDUSTRIAL")
+sel = st.sidebar.selectbox("Seleccione Prototipo:", list(PORTAFOLIO.keys()))
+p2 = st.sidebar.checkbox("Refuerzo Multinivel")
+res = calcular_industrial(sel, st.session_state['db'], {'p2': p2})
 
-lista_items = [k for k, v in PORTAFOLIO.items() if categoria == "Todo" or v['tipo'] == categoria]
-item_sel = st.sidebar.selectbox("Seleccione Solución:", lista_items)
-
-with st.sidebar:
-    st.write("---")
-    p2 = st.checkbox("Incluir Refuerzo 2do Piso") if "Vivienda" in item_sel else False
-    sat = st.checkbox("Conectividad Starlink") if "Vivienda" in item_sel else False
-
-calc = calcular_portafolio(item_sel, st.session_state['db'], {'piso2': p2, 'wifi': sat})
-
-t1, t2, t3 = st.tabs(["📊 Cotización", "📐 Ficha Unibody", "🔑 Admin Privado"])
+t1, t2, t3 = st.tabs(["📊 Propuesta Ejecutiva", "🔬 Ficha de Proceso", "🔑 Control de Planta"])
 
 with t1:
-    st.header(item_sel)
-    st.metric("INVERSIÓN FINAL", f"${calc['precio']:,.0f}")
-    st.write("### ✅ Especificaciones Técnicas:")
-    if "Vivienda" in item_sel:
-        st.write("- Piel de Roca de 5cm (Gana hasta 6% de área útil).")
-        st.write("- Estructura Monocasco Sismo-Resistente.")
-    elif "Estanque" in item_sel:
-        st.write("- Diseño Hidráulico de alta presión.")
-        st.write("- Recubrimiento de grado alimenticio.")
+    st.header(sel)
+    st.metric("INVERSIÓN SISTEMA LLAVE EN MANO", f"${res['precio']:,.0f}")
+    st.write("---")
+    st.write("### 💎 Por qué es un Sistema Industrializado:")
+    st.write("- **Precisión:** Estructuras pre-calculadas que eliminan el error humano.")
+    st.write("- **Velocidad:** Reducción del 40% en tiempos de obra frente a mampostería.")
+    st.write("- **Sostenibilidad:** Cero escombros y desperdicio de materiales optimizado.")
     
-    msg = f"Hola Manuel! Me interesa {item_sel} por ${calc['precio']:,.0f}"
-    st.markdown(f'<a href="https://wa.me/573012428215?text={urllib.parse.quote(msg)}" target="_blank"><button style="width:100%; background-color:#1E3A8A; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer;">SOLICITAR FICHA TÉCNICA</button></a>', unsafe_allow_html=True)
+    wa = f"https://wa.me/573012428215?text=Interes%20Prototipo%20{sel}"
+    st.markdown(f'<a href="{wa}" target="_blank"><button style="width:100%; background-color:#1E3A8A; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer;">INICIAR PROCESO DE VALIDACIÓN</button></a>', unsafe_allow_html=True)
 
 with t2:
-    st.subheader("Concepto de Ingeniería Monocasco")
+    st.subheader("Flujo de Manufactura en Sitio")
+    st.write("1. **Anclaje:** Fijación de bases sobre cimentación técnica.")
+    st.write("2. **Armado:** Montaje de esqueleto Steel Framing Unibody.")
+    st.write("3. **Blindaje:** Aplicación de Piel de Roca de Alta Densidad.")
     
-    st.write("Nuestro sistema elimina la necesidad de columnas pesadas, permitiendo que la pared misma soporte la carga de forma distribuida.")
 
 with t3:
-    psw = st.text_input("Password Master:", type="password")
+    psw = st.text_input("Acceso Director:", type="password")
     if psw == st.session_state['db']['config']['admin_pass']:
-        st.write(f"Costo de Operación: ${calc['c_base']:,.0f}")
-        st.write(f"Desglose: Perfiles: {calc['mat_detalle'][0]} | Bultos: {calc['mat_detalle'][1]}")
-        nuevos_p = st.data_editor(st.session_state['db']['precios'])
-        if st.button("Guardar Cambios"):
-            st.session_state['db']['precios'] = nuevos_p
-            with open(ARCHIVO_DB, 'w') as f: json.dump(st.session_state['db'], f)
-            st.rerun()
+        st.write(f"**Costo Directo:** ${res['costo_directo']:,.0f}")
+        st.write(f"**Índice de Productividad:** {res['eficiencia']} m²/jornal")
+        st.info("💡 Este índice mide cuántos m² construye un operario por día. ¡Optimízalo!")

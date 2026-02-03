@@ -5,286 +5,271 @@ from fpdf import FPDF
 from datetime import datetime
 
 # ==========================================
-# ⚙️ CONFIGURACIÓN GENERAL
+# ⚙️ CONFIGURACIÓN E IMÁGENES
 # ==========================================
 st.set_page_config(page_title="Ferrotek | ERP Integral", page_icon="🏗️", layout="wide")
 
 # ==========================================
-# 🧪 INGENIERÍA DE MEZCLAS (DENSIDADES)
+# 🧪 MÓDULO FÁBRICA (DENSIDADES)
 # ==========================================
-# Esto es vital para que "Volumen" coincida con "Peso"
-DENSIDAD = {
-    'cemento': 1.50, # kg/litro (aprox)
-    'arena': 1.60,   # kg/litro (seca)
-    'cal': 0.55      # kg/litro (¡La cal es muy liviana!)
-}
+DENSIDAD = {'cemento': 1.50, 'arena': 1.60, 'cal': 0.55}
 
 def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg):
-    """
-    Calcula insumos para producir X bultos de 30kg
-    basado en las recetas volumétricas 3:1 y 3:3:1
-    """
-    peso_meta_lote = cantidad_bultos_30kg * 30 # kg totales a producir
-    
+    peso_meta = cantidad_bultos_30kg * 30
     insumos = {}
     
-    if tipo_mezcla == "R (Relleno 3:1)":
-        # RECETA 3 PARTES ARENA : 1 PARTE CEMENTO
-        # Calculamos el peso de "1 unidad de volumen" teórica
-        # 3 L Arena (4.8kg) + 1 L Cemento (1.5kg) = 6.3 kg por unidad volumétrica
-        peso_unidad_vol = (3 * DENSIDAD['arena']) + (1 * DENSIDAD['cemento'])
+    if "Relleno" in tipo_mezcla: # 3:1 (Arena:Cemento)
+        peso_vol = (3 * DENSIDAD['arena']) + (1 * DENSIDAD['cemento'])
+        unidades = peso_meta / peso_vol
+        insumos = {'arena_L': units*3, 'cemento_L': units*1, 'cal_L': 0} if (units := unidades) else {}
         
-        # Cuántas unidades volumétricas necesitamos para llegar al peso meta
-        unidades_necesarias = peso_meta_lote / peso_unidad_vol
-        
-        # Desglose en Litros y Kilos
-        insumos['arena_L'] = unidades_necesarias * 3
-        insumos['cemento_L'] = unidades_necesarias * 1
-        insumos['cal_L'] = 0
-        
-        insumos['arena_kg'] = insumos['arena_L'] * DENSIDAD['arena']
-        insumos['cemento_kg'] = insumos['cemento_L'] * DENSIDAD['cemento']
-        insumos['cal_kg'] = 0
-        
-    elif tipo_mezcla == "A (Acabado 3:3:1)":
-        # RECETA 3 ARENA : 3 CAL : 1 CEMENTO
-        # 3 L Arena (4.8kg) + 3 L Cal (1.65kg) + 1 L Cemento (1.5kg) = 7.95 kg
-        peso_unidad_vol = (3 * DENSIDAD['arena']) + (3 * DENSIDAD['cal']) + (1 * DENSIDAD['cemento'])
-        
-        unidades_necesarias = peso_meta_lote / peso_unidad_vol
-        
-        insumos['arena_L'] = unidades_necesarias * 3
-        insumos['cal_L'] = unidades_necesarias * 3
-        insumos['cemento_L'] = unidades_necesarias * 1
-        
-        insumos['arena_kg'] = insumos['arena_L'] * DENSIDAD['arena']
-        insumos['cal_kg'] = insumos['cal_L'] * DENSIDAD['cal']
-        insumos['cemento_kg'] = insumos['cemento_L'] * DENSIDAD['cemento']
-        
+    elif "Acabado" in tipo_mezcla: # 3:3:1 (Arena:Cal:Cemento)
+        peso_vol = (3 * DENSIDAD['arena']) + (3 * DENSIDAD['cal']) + (1 * DENSIDAD['cemento'])
+        unidades = peso_meta / peso_vol
+        insumos = {'arena_L': units*3, 'cal_L': units*3, 'cemento_L': units*1} if (units := unidades) else {}
+    
+    # Calcular Kilos para Bodega
+    insumos['arena_kg'] = insumos['arena_L'] * DENSIDAD['arena']
+    insumos['cemento_kg'] = insumos['cemento_L'] * DENSIDAD['cemento']
+    insumos['cal_kg'] = insumos.get('cal_L', 0) * DENSIDAD['cal']
+    
     return insumos
 
 # ==========================================
-# 🧠 MOTOR DE VENTAS (CÓDIGO ANTERIOR)
+# 🧠 MOTOR DE COSTOS (DOBLE RECETA + BULTOS 30KG)
 # ==========================================
-def calcular_proyecto_al_detalle(area_m2):
+def calcular_proyecto(area_m2, tipo="general"):
     P = st.session_state['precios_reales']
-    margen_decimal = st.session_state['margen'] / 100
-    vol_total_m3 = area_m2 * 0.04 * 1.05
-    vol_relleno = vol_total_m3 * 0.70
-    vol_acabado = vol_total_m3 * 0.30
+    margen = st.session_state['margen'] / 100
     
-    # Receta 1:3
-    cemento_relleno = vol_relleno * 8.5 
-    arena_relleno   = vol_relleno * 1.1 
+    # Espesores y Volúmenes
+    espesor = 0.04 if tipo != "estanque" else 0.06 # Estanques más gruesos
+    vol_total = area_m2 * espesor * 1.05
     
-    # Receta 1:3:3
-    cemento_piel = vol_acabado * 4.5
-    cal_piel     = vol_acabado * 10.0 
-    arena_piel   = vol_acabado * 1.1
-
-    total_cemento = math.ceil(cemento_relleno + cemento_piel)
-    total_cal     = math.ceil(cal_piel)
-    total_arena   = (arena_relleno + arena_piel)
+    vol_relleno = vol_total * 0.70
+    vol_acabado = vol_total * 0.30
     
-    total_malla   = area_m2 * 2.1
-    total_perfil  = area_m2 * 1.2
+    # Recetas
+    cemento_tot = (vol_relleno * 8.5) + (vol_acabado * 4.5)
+    cal_tot = vol_acabado * 10.0 # Solo en acabado
+    arena_tot = vol_total * 1.1
     
-    costo_materiales = (
-        (total_cemento * P.get('cemento_gris_50kg', 29500)) +
-        (total_cal * P.get('cal_hidratada_25kg', 25000)) +    
-        (total_arena * P.get('arena_rio_m3', 98000)) +
-        (total_malla * P.get('malla_5mm_m2', 28000)) +
-        (total_perfil * P.get('perfil_c18_ml', 11500)) +
-        (area_m2 * 5000)
+    # Costos Directos
+    mat = (
+        (math.ceil(cemento_tot) * P['cemento_gris_50kg']) +
+        (math.ceil(cal_tot) * P['cal_hidratada_25kg']) +
+        (arena_tot * P['arena_rio_m3']) +
+        (area_m2 * 2.1 * P['malla_5mm_m2']) +
+        (area_m2 * 1.2 * P['perfil_c18_ml']) +
+        (area_m2 * 6000) # Varios
     )
-
+    
     rendimiento = P.get('rendimiento_dia', 4.0)
     dias = math.ceil(area_m2 / rendimiento)
-    costo_mo = dias * P.get('dia_cuadrilla', 250000)
+    mo = dias * P['dia_cuadrilla']
     
-    costo_total = costo_materiales + costo_mo
-    precio_venta = costo_total / (1 - margen_decimal)
-    utilidad = precio_venta - costo_total
+    total = mat + mo
+    venta = total / (1 - margen)
     
-    bultos_r = math.ceil((vol_relleno * 1000) / 16)
-    bultos_a = math.ceil((vol_acabado * 1000) / 16)
+    # Logística 30kg
+    b_r = math.ceil((vol_relleno * 1000) / 16)
+    b_a = math.ceil((vol_acabado * 1000) / 16)
     
     return {
-        "raw_mat": costo_materiales, "raw_mo": costo_mo, "raw_total": costo_total,
-        "precio_venta": precio_venta, "utilidad": utilidad,
-        "logistica": {"total_30kg": bultos_r + bultos_a, "R": bultos_r, "A": bultos_a},
-        "insumos": {"cemento": total_cemento, "cal": total_cal}
+        "precio": venta, "utilidad": venta - total, "costo": total,
+        "logistica": {"R": b_r, "A": b_a, "total": b_r + b_a},
+        "insumos": {"cemento": cemento_tot, "cal": cal_tot}
     }
 
 # ==========================================
-# 📄 PDF (Igual que antes)
+# 📄 PDF GENERATOR
 # ==========================================
 class PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, 'FERROTEK S.A.S - DOCUMENTO OFICIAL', 0, 1, 'C')
+        self.cell(0, 10, 'FERROTEK S.A.S', 0, 1, 'C')
         self.set_font('Arial', 'I', 10)
-        self.cell(0, 10, 'Ingeniería Unibody & Construcción Monolítica', 0, 1, 'C')
-        self.line(10, 30, 200, 30)
-        self.ln(10)
+        self.cell(0, 10, 'Tecnologia Unibody - Cotizacion Oficial', 0, 1, 'C')
+        self.line(10, 30, 200, 30); self.ln(10)
 
-def generar_pdf(cliente, obra, area, datos):
+def generar_pdf(cliente, obra, datos):
     pdf = PDF()
     pdf.add_page()
     pdf.set_font('Arial', '', 12)
     pdf.cell(0, 10, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
     pdf.cell(0, 10, f"Cliente: {cliente}", 0, 1)
-    pdf.cell(0, 10, f"Proyecto: {obra} ({area} m2)", 0, 1)
+    pdf.cell(0, 10, f"Obra: {obra}", 0, 1); pdf.ln(5)
+    
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "LOGISTICA DE MATERIALES (30KG)", 0, 1)
+    pdf.set_font('Arial', '', 11)
+    pdf.cell(0, 7, f"- Bultos Tipo R (Estructural): {datos['logistica']['R']}", 0, 1)
+    pdf.cell(0, 7, f"- Bultos Tipo A (Piel Roca): {datos['logistica']['A']}", 0, 1)
     pdf.ln(5)
     
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, "LOGÍSTICA DE MATERIALES", 0, 1)
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "INVERSION", 0, 1)
     pdf.set_font('Arial', '', 11)
-    pdf.cell(0, 7, f"- Bultos Tipo R (Estructural): {datos['logistica']['R']} Unidades", 0, 1)
-    pdf.cell(0, 7, f"- Bultos Tipo A (Piel Roca): {datos['logistica']['A']} Unidades", 0, 1)
-    pdf.ln(5)
-    
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, "INVERSIÓN", 0, 1)
-    pdf.set_font('Arial', '', 11)
-    pdf.cell(100, 8, "Valor Total", 1)
-    pdf.cell(50, 8, f"${datos['precio_venta']:,.0f}", 1, 1)
-    
+    pdf.cell(0, 10, f"Valor Total: ${datos['precio']:,.0f}", 0, 1)
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
-# 🎛️ PANEL LATERAL
+# 🎛️ SIDEBAR (ADMIN)
 # ==========================================
 with st.sidebar:
-    st.title("🎛️ Ferrotek Manager")
+    st.title("🎛️ Panel Gerente")
     pwd = st.text_input("Contraseña:", type="password")
     
     defaults = {
-        'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000,   
+        'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000, 
         'arena_rio_m3': 98000, 'malla_5mm_m2': 28000, 
         'perfil_c18_ml': 11500, 'dia_cuadrilla': 250000, 'rendimiento_dia': 4.0
     }
-    
     if 'precios_reales' not in st.session_state: st.session_state['precios_reales'] = defaults
-    if 'margen' not in st.session_state: st.session_state['margen'] = 30 
+    if 'margen' not in st.session_state: st.session_state['margen'] = 30
     
     es_admin = (pwd == "ferrotek2026")
     if es_admin:
-        st.success("🔓 Admin Activo")
-        margen = st.slider("% Utilidad", 0, 60, st.session_state['margen'])
+        st.success("🔓 Admin")
+        margen = st.slider("Utilidad %", 0, 60, st.session_state['margen'])
         st.session_state['margen'] = margen
-        with st.expander("Editar Costos Insumos"):
-            edited = st.data_editor(st.session_state['precios_reales'], key="grid_precios", num_rows="fixed")
+        with st.expander("Costos Insumos"):
+            edited = st.data_editor(st.session_state['precios_reales'], key="p_edit", num_rows="fixed")
             st.session_state['precios_reales'] = edited
 
 if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTAS
+# 🎨 VISTA 1: HOME (MENÚ)
 # ==========================================
 if st.session_state.view == 'home':
-    st.title("🏗️ FERROTEK: ERP Integral")
-    st.subheader("Seleccione Módulo:")
+    st.title("🏗️ FERROTEK: Sistema Integral")
+    st.markdown("### Seleccione Módulo:")
     
-    col1, col2, col3 = st.columns(3)
-    with col1: 
-        st.info("### 💰 Ventas")
-        if st.button("Ir a Cotizador", key="go_ventas"): set_view('viviendas')
-    with col2: 
-        st.warning("### 🏭 Fábrica")
-        st.write("Control de Mezclas y Producción.")
-        if st.button("Ir a Planta", key="go_fabrica"): set_view('fabrica')
-    with col3:
-        st.success("### 🛡️ Muros")
-        if st.button("Ir a Muros", key="go_muros"): set_view('muros')
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: 
+        if st.button("🛡️ Muros", key="nav_m", use_container_width=True): set_view('muros')
+    with c2: 
+        if st.button("🏠 Viviendas", key="nav_v", use_container_width=True): set_view('viviendas')
+    with c3:
+        if st.button("🏺 Especiales", key="nav_e", use_container_width=True): set_view('especiales')
+    with c4:
+        if st.button("🏭 Fábrica", key="nav_f", use_container_width=True): set_view('fabrica')
 
-# --- VISTA FÁBRICA (NUEVA) ---
-elif st.session_state.view == 'fabrica':
-    st.button("⬅️ Menú Principal", on_click=lambda: set_view('home'))
-    st.header("🏭 Módulo de Producción (Planta)")
-    st.markdown("---")
-    
-    tipo_prod = st.radio("¿Qué vamos a producir hoy?", ["R (Relleno 3:1)", "A (Acabado 3:3:1)"], horizontal=True)
-    
-    col_input, col_result = st.columns(2)
-    with col_input:
-        qty = st.number_input("Cantidad de Bultos (30kg) a fabricar:", value=10, step=5)
-        tamano_balde = st.selectbox("Tamaño del Balde de Medida:", [10, 20], format_func=lambda x: f"{x} Litros")
-        
-    insumos = calcular_produccion_lote(tipo_prod, qty)
-    
-    with col_result:
-        st.subheader("📋 Orden de Mezcla")
-        st.write(f"Para producir **{qty} Bultos** de 30kg:")
-        
-        # Mostrar en BALDES (Lo que entiende el operario)
-        b_arena = round(insumos['arena_L'] / tamano_balde, 1)
-        b_cemento = round(insumos['cemento_L'] / tamano_balde, 1)
-        b_cal = round(insumos.get('cal_L', 0) / tamano_balde, 1)
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Arena", f"{b_arena}", delta="Baldes")
-        c2.metric("Cemento", f"{b_cemento}", delta="Baldes")
-        if b_cal > 0:
-            c3.metric("Cal", f"{b_cal}", delta="Baldes")
-        else:
-            c3.metric("Cal", "0", delta="No lleva")
-            
-        st.info(f"ℹ️ Medido en baldes de {tamano_balde} Litros al ras.")
-
-    st.markdown("---")
-    st.subheader("🛒 Requisición a Bodega (Materia Prima)")
-    st.caption("Esto es lo que se debe sacar del inventario para esta orden:")
-    
-    df_bodega = pd.DataFrame({
-        "Insumo": ["Cemento", "Cal Hidratada", "Arena Seca"],
-        "Cantidad Exacta (kg)": [
-            f"{insumos['cemento_kg']:.1f} kg",
-            f"{insumos.get('cal_kg', 0):.1f} kg",
-            f"{insumos['arena_kg']:.1f} kg"
-        ],
-        "Equivalente Bultos Compra": [
-            f"{insumos['cemento_kg']/50:.1f} btos (50kg)",
-            f"{insumos.get('cal_kg', 0)/25:.1f} btos (25kg)",
-            f"{insumos['arena_kg']/40:.1f} btos (40kg aprox)"
-        ]
-    })
-    st.table(df_bodega)
-
-# --- VISTAS VENTAS (MANTENIDAS) ---
-elif st.session_state.view == 'viviendas':
-    st.button("⬅️ Volver", on_click=lambda: set_view('home'))
-    st.header("🏠 Cotizador de Vivienda")
-    modelo = st.selectbox("Modelo", ["Suite 30m2", "Familiar 54m2", "Máster 84m2"])
-    area_real = int(modelo.split()[1].replace("m2","")) * 3.5 
-    finanzas = calcular_proyecto_al_detalle(area_real)
-    precio_final = finanzas['precio_venta'] * 1.25
-    
-    st.metric("Precio Venta", f"${precio_final:,.0f}")
-    
-    if es_admin:
-        st.write("---")
-        st.warning(f"Utilidad: ${finanzas['utilidad']*1.25:,.0f}")
-    
-    nom = st.text_input("Cliente PDF:")
-    if nom:
-        d = finanzas.copy()
-        d['precio_venta'] = precio_final
-        pdf = generar_pdf(nom, modelo, int(area_real/3.5), d)
-        st.download_button("Descargar PDF", pdf, "cotizacion.pdf", "application/pdf")
-
+# ==========================================
+# 🎨 VISTA 2: MUROS
+# ==========================================
 elif st.session_state.view == 'muros':
     st.button("⬅️ Volver", on_click=lambda: set_view('home'))
     st.header("🛡️ Cotizador de Muros")
+    
     ml = st.number_input("Metros Lineales:", value=50.0)
     area = ml * 2.2
-    finanzas = calcular_proyecto_al_detalle(area)
+    data = calcular_proyecto(area)
     
-    st.metric("Precio Cliente", f"${finanzas['precio_venta']:,.0f}")
-    st.write(f"Logística: {finanzas['logistica']['total_30kg']} bultos (R: {finanzas['logistica']['R']} | A: {finanzas['logistica']['A']})")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("📦 Logística (Bultos 30kg)")
+        st.info(f"Relleno (Tipo R): {data['logistica']['R']}")
+        st.success(f"Acabado (Tipo A): {data['logistica']['A']}")
+        st.write(f"**Total Despacho: {data['logistica']['total']} bultos**")
+    with c2:
+        st.subheader("💰 Inversión")
+        st.metric("Precio Cliente", f"${data['precio']:,.0f}")
+        try: st.image("image_4.png", caption="Acabado Piel de Roca")
+        except: st.warning("Imagen image_4.png no encontrada")
+
+    if st.text_input("Cliente PDF:"):
+        pdf = generar_pdf("Cliente", f"Muro {ml}ml", data)
+        st.download_button("Descargar PDF", pdf, "muro.pdf")
+
+# ==========================================
+# 🎨 VISTA 3: VIVIENDAS
+# ==========================================
+elif st.session_state.view == 'viviendas':
+    st.button("⬅️ Volver", on_click=lambda: set_view('home'))
+    st.header("🏠 Cotizador de Vivienda")
     
-    nom = st.text_input("Cliente:")
-    if nom:
-        pdf = generar_pdf(nom, f"Muro {ml}ml", area, finanzas)
-        st.download_button("Descargar PDF", pdf, "cotizacion.pdf", "application/pdf")
+    mod = st.selectbox("Modelo", ["Suite 30m2", "Familiar 54m2", "Máster 84m2"])
+    area = int(mod.split()[1].replace("m2","")) * 3.5
+    
+    data = calcular_proyecto(area)
+    # Factor acabados internos
+    final_price = data['precio'] * 1.25
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Valor Llave en Mano", f"${final_price:,.0f}")
+        st.write("---")
+        st.write(f"**Logística Estructura:** {data['logistica']['total']} Bultos 30kg")
+        if es_admin:
+            st.warning(f"Utilidad Real: ${(data['utilidad']*1.25):,.0f}")
+    with c2:
+        img_map = {"Suite 30m2": "render_modelo1.png", "Familiar 54m2": "render_modelo2.png", "Máster 84m2": "render_modelo3.png"}
+        try: st.image(img_map[mod], use_column_width=True)
+        except: st.error("Imagen del render no encontrada")
+
+    if st.text_input("Cliente PDF:"):
+        d_pdf = data.copy(); d_pdf['precio'] = final_price
+        pdf = generar_pdf("Cliente", mod, d_pdf)
+        st.download_button("Descargar PDF", pdf, "casa.pdf")
+
+# ==========================================
+# 🎨 VISTA 4: ESPECIALES (DOMOS Y ESTANQUES) - ¡RECUPERADO!
+# ==========================================
+elif st.session_state.view == 'especiales':
+    st.button("⬅️ Volver", on_click=lambda: set_view('home'))
+    st.header("🏺 Ingeniería Especial")
+    
+    tab1, tab2 = st.tabs(["Bóvedas / Domos", "Estanques"])
+    
+    with tab1:
+        st.subheader("Bóveda Auto-Portante (Luz 3.80m)")
+        largo = st.slider("Largo (m)", 3.0, 15.0, 6.0)
+        area_bov = largo * 7.5 # Perimetro arco aprox
+        data_b = calcular_proyecto(area_bov)
+        
+        c_a, c_b = st.columns(2)
+        with c_a:
+            st.metric("Inversión Bóveda", f"${data_b['precio']:,.0f}")
+            st.write(f"Materiales: {data_b['logistica']['total']} Bultos")
+        with c_b:
+            try: st.image("image_15.png", caption="Bóveda Ferrotek")
+            except: st.warning("Imagen image_15.png no encontrada")
+            
+    with tab2:
+        st.subheader("Estanque Piscícola Monolítico")
+        diam = st.number_input("Diámetro (m)", 4.0, 20.0, 6.0)
+        altura = 1.2
+        area_est = (math.pi * diam * altura) + (math.pi * (diam/2)**2)
+        data_e = calcular_proyecto(area_est, tipo="estanque") # Usa espesor mayor
+        
+        st.metric("Inversión Estanque", f"${data_e['precio']:,.0f}")
+        st.info(f"Incluye {data_e['logistica']['total']} bultos de alta resistencia.")
+
+# ==========================================
+# 🎨 VISTA 5: FÁBRICA (PRODUCCIÓN)
+# ==========================================
+elif st.session_state.view == 'fabrica':
+    st.button("⬅️ Volver", on_click=lambda: set_view('home'))
+    st.header("🏭 Planta de Producción")
+    
+    tipo = st.radio("Mezcla:", ["Relleno (3:1)", "Acabado (3:3:1)"], horizontal=True)
+    qty = st.number_input("Bultos a Fabricar (30kg):", 10, 500, 20)
+    balde = st.selectbox("Balde Medida:", [10, 20], format_func=lambda x: f"{x} Litros")
+    
+    res = calcular_produccion_lote(tipo, qty)
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("📋 Receta (Baldes)")
+        st.metric("Arena", f"{round(res['arena_L']/balde, 1)}", "Baldes")
+        st.metric("Cemento", f"{round(res['cemento_L']/balde, 1)}", "Baldes")
+        if res.get('cal_L', 0) > 0:
+            st.metric("Cal", f"{round(res['cal_L']/balde, 1)}", "Baldes")
+            
+    with c2:
+        st.subheader("🛒 Sacar de Bodega")
+        st.table(pd.DataFrame({
+            "Material": ["Arena", "Cemento", "Cal"],
+            "Kg Reales": [f"{res['arena_kg']:.1f}", f"{res['cemento_kg']:.1f}", f"{res.get('cal_kg',0):.1f}"]
+        }))

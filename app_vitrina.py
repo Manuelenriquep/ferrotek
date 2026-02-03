@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import math
+import os # <--- NUEVO: Para escanear tus archivos
 from fpdf import FPDF
 from datetime import datetime
 
@@ -18,40 +19,34 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg):
     peso_meta = cantidad_bultos_30kg * 30
     insumos = {}
     
-    # Lógica de Fábrica (Baldes y Kilos)
-    if "Relleno" in tipo_mezcla: # 3:1
+    if "Relleno" in tipo_mezcla: 
         peso_vol = (3 * DENSIDAD['arena']) + (1 * DENSIDAD['cemento'])
         if peso_vol > 0:
             units = peso_meta / peso_vol
             insumos = {'arena_L': units*3, 'cemento_L': units*1, 'cal_L': 0}
-        
-    elif "Acabado" in tipo_mezcla: # 3:3:1
+    elif "Acabado" in tipo_mezcla: 
         peso_vol = (3 * DENSIDAD['arena']) + (3 * DENSIDAD['cal']) + (1 * DENSIDAD['cemento'])
         if peso_vol > 0:
             units = peso_meta / peso_vol
             insumos = {'arena_L': units*3, 'cal_L': units*3, 'cemento_L': units*1}
     
-    # Evitar errores si insumos está vacío
     if not insumos: return {}
 
     insumos['arena_kg'] = insumos['arena_L'] * DENSIDAD['arena']
     insumos['cemento_kg'] = insumos['cemento_L'] * DENSIDAD['cemento']
     insumos['cal_kg'] = insumos.get('cal_L', 0) * DENSIDAD['cal']
-    
     return insumos
 
 # ==========================================
 # 🧠 MOTOR DE COSTOS (V78 - OPTIMIZADO + GOTERO)
 # ==========================================
 def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
-    # Recuperar variables de sesión
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
     espesor = 0.04 if tipo != "estanque" else 0.06
     vol_total = area_m2 * espesor * 1.05
     
-    # Recetas (Doble Capa)
     vol_relleno = vol_total * 0.70
     vol_acabado = vol_total * 0.30
     
@@ -59,35 +54,28 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     cal_tot = vol_acabado * 10.0 
     arena_tot = vol_total * 1.1
     
-    # AJUSTE DE PERFILERÍA (Postes a 1.20m + Malla Doblada)
-    # Factor 0.9 ml de perfil por m2 de muro
     factor_perfil = 0.9 
     
-    # Costos Directos Materiales
     mat = (
         (math.ceil(cemento_tot) * P['cemento_gris_50kg']) +
         (math.ceil(cal_tot) * P['cal_hidratada_25kg']) +
         (arena_tot * P['arena_rio_m3']) +
         (area_m2 * 2.1 * P['malla_5mm_m2']) +
         (area_m2 * factor_perfil * P['perfil_c18_ml']) + 
-        (area_m2 * 5000) # Insumos menores
+        (area_m2 * 5000)
     )
     
-    # Mano de Obra Base
-    rendimiento = P.get('rendimiento_dia', 4.5) # Optimizado por menos cortes
+    rendimiento = P.get('rendimiento_dia', 4.5)
     dias = math.ceil(area_m2 / rendimiento)
     mo_base = dias * P['dia_cuadrilla']
     
-    # --- AJUSTE: COBRO EXTRA POR GOTERO ---
     costo_gotero = 0
     if tiene_gotero and ml_muro > 0:
-        # Se cobra un extra por metro lineal para pagar los filos y el detalle
         costo_gotero = ml_muro * 25000 
     
     total = mat + mo_base + costo_gotero
     venta = total / (1 - margen)
     
-    # Logística Interna (Solo para Admin)
     b_r = math.ceil((vol_relleno * 1000) / 16)
     b_a = math.ceil((vol_acabado * 1000) / 16)
     
@@ -98,7 +86,7 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     }
 
 # ==========================================
-# 📄 PDF GENERATOR (CLIENTE)
+# 📄 PDF GENERATOR
 # ==========================================
 class PDF(FPDF):
     def header(self):
@@ -133,17 +121,15 @@ def generar_pdf(cliente, obra, datos, incluye_gotero=False):
     pdf.ln(10)
     pdf.set_font('Arial', 'I', 9)
     pdf.cell(0, 10, "Validez de la oferta: 15 días. No incluye viáticos fuera del área metropolitana.", 0, 1)
-    
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
-# 🎛️ SIDEBAR (ADMIN PANEL)
+# 🎛️ SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("🎛️ Panel Gerente")
     pwd = st.text_input("Contraseña:", type="password")
     
-    # Precios Base (Editables)
     defaults = {
         'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000, 
         'arena_rio_m3': 98000, 'malla_5mm_m2': 28000, 
@@ -165,14 +151,13 @@ if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTA 1: HOME (VITRINA VENDEDORA)
+# 🎨 VISTA 1: HOME (CON GALERÍA DINÁMICA)
 # ==========================================
 if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Construcción del Futuro")
     st.subheader("Más fuerte que el bloque, más fresco que el ladrillo.")
     st.markdown("---")
 
-    # Argumentos de Venta
     c1, c2, c3 = st.columns(3)
     with c1:
         st.info("### 🛡️ Indestructible")
@@ -187,7 +172,6 @@ if st.session_state.view == 'home':
     st.markdown("---")
     st.subheader("🚀 Cotizadores")
     
-    # Botones de Navegación
     b1, b2, b3, b4 = st.columns(4)
     with b1: 
         if st.button("🛡️ Muros", key="nav_m", use_container_width=True): set_view('muros')
@@ -198,18 +182,23 @@ if st.session_state.view == 'home':
     with b4:
         if st.button("🏭 Fábrica", key="nav_f", use_container_width=True): set_view('fabrica')
 
-    # Galería
+    # --- GALERÍA AUTOMÁTICA (EL ESCÁNER) ---
     st.markdown("---")
-    g1, g2, g3 = st.columns(3)
-    with g1: 
-        try: st.image("render_modelo1.png", caption="Diseño Moderno", use_container_width=True)
-        except: pass
-    with g2: 
-        try: st.image("image_4.png", caption="Acabado Piel de Roca", use_container_width=True)
-        except: pass
-    with g3: 
-        try: st.image("image_15.png", caption="Bóvedas", use_container_width=True)
-        except: pass
+    st.subheader("📸 Galería de Obras")
+    
+    # 1. Escanear carpeta
+    archivos = os.listdir('.')
+    # 2. Filtrar solo imagenes
+    imagenes = [f for f in archivos if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+    
+    if imagenes:
+        # 3. Mostrar en grilla de 3 columnas
+        cols = st.columns(3)
+        for i, img_file in enumerate(imagenes):
+            with cols[i % 3]:
+                st.image(img_file, caption=img_file, use_container_width=True)
+    else:
+        st.info("ℹ️ No se encontraron imágenes en la carpeta del servidor. Suba sus fotos al repositorio.")
 
 # ==========================================
 # 🎨 VISTA 2: MUROS (CON GOTERO)
@@ -222,7 +211,6 @@ elif st.session_state.view == 'muros':
     with c_in1:
         ml = st.number_input("Metros Lineales:", value=50.0)
     with c_in2:
-        # CHECKBOX CLAVE PARA COBRAR BIEN
         gotero = st.checkbox("Incluir Remate Superior (Gotero/Viga Cinta)", value=True, help="Agrega costo extra por filos y detalles.")
         
     area = ml * 2.2
@@ -234,7 +222,7 @@ elif st.session_state.view == 'muros':
         st.metric("Precio Cliente", f"${data['precio']:,.0f}")
         
         if gotero:
-            st.success("✅ Incluye Viga Cinta / Gotero (Mayor rigidez y limpieza).")
+            st.success("✅ Incluye Viga Cinta / Gotero.")
         else:
             st.warning("⚠️ Remate simple.")
             
@@ -263,7 +251,7 @@ elif st.session_state.view == 'viviendas':
     area = int(mod.split()[1].replace("m2","")) * 3.5
     
     data = calcular_proyecto(area)
-    final_price = data['precio'] * 1.25 # Factor acabados internos
+    final_price = data['precio'] * 1.25 # Factor acabados
     
     c1, c2 = st.columns(2)
     with c1:
@@ -297,7 +285,7 @@ elif st.session_state.view == 'especiales':
     with tab1:
         st.subheader("Bóveda Auto-Portante (3.80m)")
         largo = st.slider("Largo (m)", 3.0, 15.0, 6.0)
-        data_b = calcular_proyecto(largo * 7.5) # Perimetro arco aprox
+        data_b = calcular_proyecto(largo * 7.5) 
         
         c_a, c_b = st.columns(2)
         with c_a:
@@ -309,7 +297,6 @@ elif st.session_state.view == 'especiales':
     with tab2:
         st.subheader("Estanque Piscícola")
         diam = st.number_input("Diámetro (m)", 4.0, 20.0, 6.0)
-        # Área envolvente aprox
         area_est = (math.pi * diam * 1.2) + (math.pi * (diam/2)**2)
         data_e = calcular_proyecto(area_est, tipo="estanque") 
         st.metric("Inversión Estanque", f"${data_e['precio']:,.0f}")

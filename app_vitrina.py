@@ -175,8 +175,8 @@ elif st.session_state.view == 'muros':
     with c2:
         st.subheader("💰 Inversión")
         st.metric("Precio Cliente", f"${data['precio']:,.0f}")
-        try: st.image("image_4.png", caption="Acabado Piel de Roca")
-        except: st.warning("Imagen image_4.png no encontrada")
+        try: st.image("image_4.jpg", caption="Acabado Piel de Roca")
+        except: st.warning("Imagen image_4.jpg no encontrada")
 
     if st.text_input("Cliente PDF:"):
         pdf = generar_pdf("Cliente", f"Muro {ml}ml", data)

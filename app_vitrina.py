@@ -110,7 +110,7 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     }
 
 # ==========================================
-# 📄 PDF GENERATOR (CORREGIDO)
+# 📄 PDF GENERATOR (FIX BYTEARRAY)
 # ==========================================
 class PDF(FPDF):
     def header(self):
@@ -165,9 +165,9 @@ def generar_pdf(cliente, obra, datos, tipo="general", incluye_gotero=False):
     pdf.set_font('Arial', 'I', 9)
     pdf.cell(0, 10, "Validez: 15 días. Excluye movimiento de tierras y viáticos.", 0, 1)
     
-    # --- CORRECCIÓN DEL BUG ---
-    # Convertimos el buffer a bytes directamente, sin encode
-    return bytes(pdf.output(dest='S'))
+    # --- CORRECCIÓN DEFINITIVA ---
+    # Eliminamos .encode() porque el objeto ya es bytes
+    return pdf.output(dest='S')
 
 # ==========================================
 # 🎛️ SIDEBAR

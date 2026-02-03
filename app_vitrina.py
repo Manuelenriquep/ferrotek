@@ -38,15 +38,26 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg):
     return insumos
 
 # ==========================================
-# 🧠 MOTOR DE COSTOS (V78 - OPTIMIZADO + GOTERO)
+# 🧠 MOTOR DE COSTOS (V83 - ESTRUCTURA + PACK ACABADOS)
 # ==========================================
 def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
-    espesor = 0.04 if tipo != "estanque" else 0.06
-    vol_total = area_m2 * espesor * 1.05
+    # --- 1. CÁLCULO DE ESTRUCTURA (FERROTEK) ---
+    espesor = 0.04 
+    factor_malla = 2.1
+    factor_perfil = 0.9 
+    varillas_refuerzo = 0
     
+    if tipo == "estanque":
+        espesor = 0.06; varillas_refuerzo = area_m2 * 1.5; factor_perfil = 0
+    elif tipo == "boveda":
+        espesor = 0.05; varillas_refuerzo = area_m2 * 0.8; factor_perfil = 0
+    elif tipo == "vivienda":
+        espesor = 0.055; factor_malla = 1.6 # Mixto
+    
+    vol_total = area_m2 * espesor * 1.05
     vol_relleno = vol_total * 0.70
     vol_acabado = vol_total * 0.30
     
@@ -54,39 +65,54 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     cal_tot = vol_acabado * 10.0 
     arena_tot = vol_total * 1.1
     
-    factor_perfil = 0.9 
-    
-    mat = (
+    costo_estructura_mat = (
         (math.ceil(cemento_tot) * P['cemento_gris_50kg']) +
         (math.ceil(cal_tot) * P['cal_hidratada_25kg']) +
         (arena_tot * P['arena_rio_m3']) +
-        (area_m2 * 2.1 * P['malla_5mm_m2']) +
-        (area_m2 * factor_perfil * P['perfil_c18_ml']) + 
+        (area_m2 * factor_malla * P['malla_5mm_m2']) +
+        (area_m2 * factor_perfil * P['perfil_c18_ml']) +
+        (math.ceil(varillas_refuerzo) * P.get('varilla_refuerzo_6m', 24000)) +
         (area_m2 * 5000)
     )
     
     rendimiento = P.get('rendimiento_dia', 4.5)
+    if tipo in ["estanque", "boveda"]: rendimiento = 3.0
     dias = math.ceil(area_m2 / rendimiento)
-    mo_base = dias * P['dia_cuadrilla']
+    costo_mo_estructura = dias * P['dia_cuadrilla']
     
     costo_gotero = 0
-    if tiene_gotero and ml_muro > 0:
-        costo_gotero = ml_muro * 25000 
+    if tiene_gotero and ml_muro > 0: costo_gotero = ml_muro * 25000 
     
-    total = mat + mo_base + costo_gotero
-    venta = total / (1 - margen)
+    costo_directo_estructura = costo_estructura_mat + costo_mo_estructura + costo_gotero
     
+    # --- 2. CÁLCULO DE ACABADOS (PAQUETE LLAVE EN MANO) ---
+    costo_acabados = 0
+    if tipo == "vivienda":
+        # Usamos el valor por m2 definido en el Sidebar
+        valor_m2_acabado = P.get('valor_acabados_m2', 450000)
+        # El área de acabados suele ser el área de piso (aprox area_m2 / 3.5)
+        area_piso = area_m2 / 3.5 
+        costo_acabados = area_piso * valor_m2_acabado
+
+    # --- 3. TOTALES ---
+    costo_total_proyecto = costo_directo_estructura + costo_acabados
+    precio_venta = costo_total_proyecto / (1 - margen)
+    
+    # Logística
     b_r = math.ceil((vol_relleno * 1000) / 16)
     b_a = math.ceil((vol_acabado * 1000) / 16)
     
     return {
-        "precio": venta, "utilidad": venta - total, "costo": total,
+        "precio": precio_venta, 
+        "utilidad": precio_venta - costo_total_proyecto, 
+        "costo_total": costo_total_proyecto,
+        "desglose": {"estructura": costo_directo_estructura, "acabados": costo_acabados},
         "logistica": {"R": b_r, "A": b_a, "total": b_r + b_a},
-        "insumos": {"cemento": cemento_tot, "cal": cal_tot}
+        "insumos": {"cemento": cemento_tot, "cal": cal_tot, "varilla": varillas_refuerzo}
     }
 
 # ==========================================
-# 📄 PDF GENERATOR
+# 📄 PDF GENERATOR (CONTRATO DETALLADO)
 # ==========================================
 class PDF(FPDF):
     def header(self):
@@ -96,7 +122,7 @@ class PDF(FPDF):
         self.cell(0, 10, 'Ingeniería Unibody & Construcción Monolítica', 0, 1, 'C')
         self.line(10, 30, 200, 30); self.ln(10)
 
-def generar_pdf(cliente, obra, datos, incluye_gotero=False):
+def generar_pdf(cliente, obra, datos, tipo="general", incluye_gotero=False):
     pdf = PDF()
     pdf.add_page()
     pdf.set_font('Arial', '', 12)
@@ -104,23 +130,42 @@ def generar_pdf(cliente, obra, datos, incluye_gotero=False):
     pdf.cell(0, 10, f"Cliente: {cliente}", 0, 1)
     pdf.cell(0, 10, f"Proyecto: {obra}", 0, 1); pdf.ln(5)
     
-    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "ALCANCE TÉCNICO", 0, 1)
+    # SECCIÓN 1: ESTRUCTURA
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "1. ESPECIFICACIONES ESTRUCTURALES", 0, 1)
     pdf.set_font('Arial', '', 11)
+    texto_est = (
+        "Sistema Ferrotek Unibody Sismo-Resistente.\n"
+        "- Muros con alma de acero y mortero estructural de alta resistencia.\n"
+        "- Acabado Piel de Roca impermeable (No requiere pintura)."
+    )
+    if incluye_gotero: texto_est += "\n- Remate superior tipo Gotero."
+    pdf.multi_cell(0, 7, texto_est)
+    pdf.ln(3)
+
+    # SECCIÓN 2: PAQUETE DE ACABADOS (SOLO VIVIENDA)
+    if tipo == "vivienda":
+        pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "2. PAQUETE DE ACABADOS E INSTALACIONES", 0, 1)
+        pdf.set_font('Arial', '', 10) # Letra un poco más chica para que quepa todo
+        texto_acabados = (
+            "El valor 'Llave en Mano' incluye:\n"
+            "A. INSTALACIONES: Red eléctrica interna (Puntos tomacorriente, interruptores y rosetas básicos norma RETIE). "
+            "Red hidrosanitaria estándar (PVC y CPVC) para baños y cocina.\n"
+            "B. PISOS: Cerámica tráfico medio o Piso Polimérico estándar (Según disponibilidad).\n"
+            "C. BAÑOS: Combo sanitario estándar (Sanitario + Lavamanos de pedestal) y grifería básica.\n"
+            "D. CARPINTERÍA: Puertas internas entamboradas y ventanería en aluminio crudo/natural.\n"
+            "NOTA: No incluye cocina integral (solo mesón básico), ni calentador, ni acabados de lujo."
+        )
+        pdf.multi_cell(0, 6, texto_acabados)
+        pdf.ln(5)
     
-    texto_base = "Suministro e instalación de sistema Ferrotek Unibody (Piel de Roca). Estructura sismo-resistente de acero con recubrimiento monolítico impermeable."
-    if incluye_gotero:
-        texto_base += " Incluye remate superior tipo 'Gotero/Viga Cinta' para protección de fachada y mayor rigidez."
-        
-    pdf.multi_cell(0, 7, texto_base)
-    pdf.ln(5)
-    
-    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "INVERSIÓN", 0, 1)
+    # SECCIÓN 3: PRECIO
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "INVERSIÓN TOTAL", 0, 1)
     pdf.set_font('Arial', '', 11)
-    pdf.cell(0, 10, f"Valor Total: ${datos['precio']:,.0f}", 0, 1)
+    pdf.cell(0, 10, f"Valor: ${datos['precio']:,.0f}", 0, 1)
     
     pdf.ln(10)
     pdf.set_font('Arial', 'I', 9)
-    pdf.cell(0, 10, "Validez de la oferta: 15 días. No incluye viáticos fuera del área metropolitana.", 0, 1)
+    pdf.cell(0, 10, "Validez: 15 días. Excluye movimiento de tierras y viáticos.", 0, 1)
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================
@@ -133,7 +178,9 @@ with st.sidebar:
     defaults = {
         'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000, 
         'arena_rio_m3': 98000, 'malla_5mm_m2': 28000, 
-        'perfil_c18_ml': 11500, 'dia_cuadrilla': 250000, 'rendimiento_dia': 4.5
+        'perfil_c18_ml': 11500, 'varilla_refuerzo_6m': 24000,
+        'dia_cuadrilla': 250000, 'rendimiento_dia': 4.5,
+        'valor_acabados_m2': 450000 # <--- NUEVO ITEM: PAQUETE BAÑO/ELECTRICO/PISOS
     }
     if 'precios_reales' not in st.session_state: st.session_state['precios_reales'] = defaults
     if 'margen' not in st.session_state: st.session_state['margen'] = 30
@@ -141,9 +188,9 @@ with st.sidebar:
     es_admin = (pwd == "ferrotek2026")
     if es_admin:
         st.success("🔓 Admin Activo")
-        margen = st.slider("Utilidad Deseada %", 0, 60, st.session_state['margen'])
+        margen = st.slider("Utilidad %", 0, 60, st.session_state['margen'])
         st.session_state['margen'] = margen
-        with st.expander("Editar Costos Insumos"):
+        with st.expander("Costos & Acabados"):
             edited = st.data_editor(st.session_state['precios_reales'], key="p_edit", num_rows="fixed")
             st.session_state['precios_reales'] = edited
 
@@ -151,7 +198,7 @@ if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTA 1: HOME (TEXTOS CORREGIDOS)
+# 🎨 VISTA 1: HOME
 # ==========================================
 if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Ingeniería Monolítica")
@@ -160,14 +207,14 @@ if st.session_state.view == 'home':
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.info("### 🛡️ Sismo-Resistente") # Cambio Indestructible
-        st.write("Estructura continua (Unibody) con alma de acero. Mayor seguridad estructural que la mampostería suelta.")
+        st.info("### 🛡️ Sismo-Resistente")
+        st.write("Estructura continua (Unibody) con alma de acero.")
     with c2:
         st.success("### 🌡️ Confort Térmico")
-        st.write("Doble membrana aislante. Ambientes más frescos de forma natural, reduciendo el calor radiante.")
+        st.write("Doble membrana aislante en muros exteriores.")
     with c3:
-        st.warning("### 💰 Mínimo Mantenimiento") # Cambio Cero Mantenimiento
-        st.write("Acabado Piel de Roca. Una superficie pétrea impermeable que elimina el gasto de pintura por años.")
+        st.warning("### 💰 Mínimo Mantenimiento")
+        st.write("Acabado Piel de Roca impermeable.")
 
     st.markdown("---")
     st.subheader("🚀 Cotizadores")
@@ -182,20 +229,15 @@ if st.session_state.view == 'home':
     with b4:
         if st.button("🏭 Fábrica", key="nav_f", use_container_width=True): set_view('fabrica')
 
-    # --- GALERÍA AUTOMÁTICA ---
     st.markdown("---")
     st.subheader("📸 Galería de Obras")
-    
     archivos = os.listdir('.')
     imagenes = [f for f in archivos if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
-    
     if imagenes:
         cols = st.columns(3)
         for i, img_file in enumerate(imagenes):
             with cols[i % 3]:
                 st.image(img_file, caption=img_file, use_container_width=True)
-    else:
-        st.info("ℹ️ Galería lista. Suba sus fotos al repositorio para verlas aquí.")
 
 # ==========================================
 # 🎨 VISTA 2: MUROS
@@ -208,34 +250,25 @@ elif st.session_state.view == 'muros':
     with c_in1:
         ml = st.number_input("Metros Lineales:", value=50.0)
     with c_in2:
-        gotero = st.checkbox("Incluir Remate Superior (Gotero/Viga Cinta)", value=True, help="Agrega costo extra por filos y detalles.")
+        gotero = st.checkbox("Incluir Remate Superior (Gotero)", value=True)
         
     area = ml * 2.2
     data = calcular_proyecto(area, ml_muro=ml, tipo="general", tiene_gotero=gotero)
     
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("💰 Inversión")
         st.metric("Precio Cliente", f"${data['precio']:,.0f}")
-        
-        if gotero:
-            st.success("✅ Incluye Viga Cinta / Gotero.")
-        else:
-            st.warning("⚠️ Remate simple.")
-            
         if es_admin:
             st.error("🕵️ DATA PRIVADA")
-            st.write(f"Costo Real: ${data['costo']:,.0f} | Utilidad: ${data['utilidad']:,.0f}")
-            st.write(f"Logística: {data['logistica']['total']} Bultos 30kg")
-            st.caption(f"Cemento: {data['insumos']['cemento']:.1f} btos | Cal: {data['insumos']['cal']:.1f} btos")
-            
+            st.write(f"Costo: ${data['costo_total']:,.0f} | Utilidad: ${data['utilidad']:,.0f}")
+            st.caption(f"Cemento: {data['insumos']['cemento']:.1f} btos")
     with c2:
-        try: st.image("image_4.png", caption="Textura Real", use_container_width=True)
+        try: st.image("image_4.png", use_container_width=True)
         except: pass
 
     if st.text_input("Nombre Cliente:"):
-        pdf = generar_pdf("Cliente", f"Muro {ml}ml", data, incluye_gotero=gotero)
-        st.download_button("Descargar Cotización PDF", pdf, "muro.pdf")
+        pdf = generar_pdf("Cliente", f"Muro {ml}ml", data, tipo="general", incluye_gotero=gotero)
+        st.download_button("Descargar PDF", pdf, "muro.pdf")
 
 # ==========================================
 # 🎨 VISTA 3: VIVIENDAS
@@ -247,18 +280,18 @@ elif st.session_state.view == 'viviendas':
     mod = st.selectbox("Seleccione Modelo", ["Suite 30m2", "Familiar 54m2", "Máster 84m2"])
     area = int(mod.split()[1].replace("m2","")) * 3.5
     
-    data = calcular_proyecto(area)
-    final_price = data['precio'] * 1.25 # Factor acabados
+    data = calcular_proyecto(area, tipo="vivienda") 
     
     c1, c2 = st.columns(2)
     with c1:
-        st.metric("Valor Llave en Mano", f"${final_price:,.0f}")
-        st.info("Incluye estructura, muros Piel de Roca y pisos poliméricos.")
+        st.metric("Valor Llave en Mano", f"${data['precio']:,.0f}")
+        st.info("Incluye estructura, muros, pisos, baño estándar y red eléctrica básica.")
         
         if es_admin:
             st.error("🕵️ DATA PRIVADA")
-            st.write(f"Utilidad Est: ${(data['utilidad']*1.25):,.0f}")
-            st.write(f"Estructura Base: {data['logistica']['total']} Bultos 30kg")
+            st.write(f"Utilidad: ${(data['utilidad']):,.0f}")
+            st.write(f"Costo Estructura: ${data['desglose']['estructura']:,.0f}")
+            st.write(f"Costo Acabados (Est): ${data['desglose']['acabados']:,.0f}")
             
     with c2:
         img_map = {"Suite 30m2": "render_modelo1.png", "Familiar 54m2": "render_modelo2.png", "Máster 84m2": "render_modelo3.png"}
@@ -266,9 +299,8 @@ elif st.session_state.view == 'viviendas':
         except: st.error("Imagen no cargada")
 
     if st.text_input("Nombre Cliente:"):
-        d_pdf = data.copy(); d_pdf['precio'] = final_price
-        pdf = generar_pdf("Cliente", mod, d_pdf)
-        st.download_button("Descargar Cotización PDF", pdf, "casa.pdf")
+        pdf = generar_pdf("Cliente", mod, data, tipo="vivienda")
+        st.download_button("Descargar PDF", pdf, "casa.pdf")
 
 # ==========================================
 # 🎨 VISTA 4: ESPECIALES
@@ -278,18 +310,12 @@ elif st.session_state.view == 'especiales':
     st.header("🏺 Proyectos Especiales")
     
     tab1, tab2 = st.tabs(["Bóvedas", "Estanques"])
-    
     with tab1:
-        st.subheader("Bóveda Auto-Portante (3.80m)")
+        st.subheader("Bóveda (3.80m)")
         largo = st.slider("Largo (m)", 3.0, 15.0, 6.0)
-        data_b = calcular_proyecto(largo * 7.5) 
-        
-        c_a, c_b = st.columns(2)
-        with c_a:
-            st.metric("Inversión Bóveda", f"${data_b['precio']:,.0f}")
-        with c_b:
-            try: st.image("image_15.png", caption="Bóveda", use_container_width=True)
-            except: pass
+        data_b = calcular_proyecto(largo * 7.5, tipo="boveda") 
+        st.metric("Inversión Bóveda", f"${data_b['precio']:,.0f}")
+        if es_admin: st.caption(f"Refuerzo: {data_b['insumos']['varilla']:.1f} un")
             
     with tab2:
         st.subheader("Estanque Piscícola")
@@ -297,6 +323,7 @@ elif st.session_state.view == 'especiales':
         area_est = (math.pi * diam * 1.2) + (math.pi * (diam/2)**2)
         data_e = calcular_proyecto(area_est, tipo="estanque") 
         st.metric("Inversión Estanque", f"${data_e['precio']:,.0f}")
+        if es_admin: st.caption(f"Refuerzo: {data_e['insumos']['varilla']:.1f} un")
 
 # ==========================================
 # 🎨 VISTA 5: FÁBRICA
@@ -305,24 +332,19 @@ elif st.session_state.view == 'fabrica':
     st.button("⬅️ Volver al Inicio", on_click=lambda: set_view('home'))
     st.header("🏭 Planta de Producción")
     
-    tipo = st.radio("Tipo de Mezcla:", ["Relleno (3:1)", "Acabado (3:3:1)"], horizontal=True)
-    qty = st.number_input("Cantidad de Bultos (30kg) a fabricar:", 10, 500, 20)
-    balde = st.selectbox("Tamaño Balde:", [10, 20], format_func=lambda x: f"{x} Litros")
-    
+    tipo = st.radio("Mezcla:", ["Relleno (3:1)", "Acabado (3:3:1)"], horizontal=True)
+    qty = st.number_input("Bultos a Fabricar (30kg):", 10, 500, 20)
+    balde = st.selectbox("Balde:", [10, 20], format_func=lambda x: f"{x} Litros")
     res = calcular_produccion_lote(tipo, qty)
     
     if res:
         c1, c2 = st.columns(2)
         with c1:
-            st.subheader("📋 Receta Operativa")
             st.metric("Arena", f"{round(res['arena_L']/balde, 1)}", "Baldes")
             st.metric("Cemento", f"{round(res['cemento_L']/balde, 1)}", "Baldes")
-            if res.get('cal_L', 0) > 0:
-                st.metric("Cal", f"{round(res['cal_L']/balde, 1)}", "Baldes")
-                
+            if res.get('cal_L', 0) > 0: st.metric("Cal", f"{round(res['cal_L']/balde, 1)}", "Baldes")
         with c2:
-            st.subheader("🛒 Consumo Bodega")
             st.table(pd.DataFrame({
                 "Insumo": ["Arena", "Cemento", "Cal"],
-                "Kg Reales": [f"{res['arena_kg']:.1f}", f"{res['cemento_kg']:.1f}", f"{res.get('cal_kg',0):.1f}"]
+                "Kg": [f"{res['arena_kg']:.1f}", f"{res['cemento_kg']:.1f}", f"{res.get('cal_kg',0):.1f}"]
             }))

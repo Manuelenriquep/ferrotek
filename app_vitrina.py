@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import math
-import os # <--- NUEVO: Para escanear tus archivos
+import os
 from fpdf import FPDF
 from datetime import datetime
 
@@ -11,7 +11,7 @@ from datetime import datetime
 st.set_page_config(page_title="Ferrotek | ERP Integral", page_icon="🏗️", layout="wide")
 
 # ==========================================
-# 🧪 MÓDULO FÁBRICA (DENSIDADES)
+# 🧪 MÓDULO FÁBRICA
 # ==========================================
 DENSIDAD = {'cemento': 1.50, 'arena': 1.60, 'cal': 0.55}
 
@@ -151,23 +151,23 @@ if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTA 1: HOME (CON GALERÍA DINÁMICA)
+# 🎨 VISTA 1: HOME (TEXTOS CORREGIDOS)
 # ==========================================
 if st.session_state.view == 'home':
-    st.title("🏗️ FERROTEK: Construcción del Futuro")
-    st.subheader("Más fuerte que el bloque, más fresco que el ladrillo.")
+    st.title("🏗️ FERROTEK: Ingeniería Monolítica")
+    st.subheader("La evolución inteligente de la construcción tradicional.")
     st.markdown("---")
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.info("### 🛡️ Indestructible")
-        st.write("Tecnología Unibody Monolítica con alma de acero. Sismo-Resistencia superior.")
+        st.info("### 🛡️ Sismo-Resistente") # Cambio Indestructible
+        st.write("Estructura continua (Unibody) con alma de acero. Mayor seguridad estructural que la mampostería suelta.")
     with c2:
-        st.success("### 🌡️ Climatizada")
-        st.write("Doble membrana térmica. Frescura natural sin aire acondicionado.")
+        st.success("### 🌡️ Confort Térmico")
+        st.write("Doble membrana aislante. Ambientes más frescos de forma natural, reduciendo el calor radiante.")
     with c3:
-        st.warning("### 💰 Cero Mantenimiento")
-        st.write("Piel de Roca impermeable. Fachadas que nunca necesitan pintura.")
+        st.warning("### 💰 Mínimo Mantenimiento") # Cambio Cero Mantenimiento
+        st.write("Acabado Piel de Roca. Una superficie pétrea impermeable que elimina el gasto de pintura por años.")
 
     st.markdown("---")
     st.subheader("🚀 Cotizadores")
@@ -182,26 +182,23 @@ if st.session_state.view == 'home':
     with b4:
         if st.button("🏭 Fábrica", key="nav_f", use_container_width=True): set_view('fabrica')
 
-    # --- GALERÍA AUTOMÁTICA (EL ESCÁNER) ---
+    # --- GALERÍA AUTOMÁTICA ---
     st.markdown("---")
     st.subheader("📸 Galería de Obras")
     
-    # 1. Escanear carpeta
     archivos = os.listdir('.')
-    # 2. Filtrar solo imagenes
     imagenes = [f for f in archivos if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
     
     if imagenes:
-        # 3. Mostrar en grilla de 3 columnas
         cols = st.columns(3)
         for i, img_file in enumerate(imagenes):
             with cols[i % 3]:
                 st.image(img_file, caption=img_file, use_container_width=True)
     else:
-        st.info("ℹ️ No se encontraron imágenes en la carpeta del servidor. Suba sus fotos al repositorio.")
+        st.info("ℹ️ Galería lista. Suba sus fotos al repositorio para verlas aquí.")
 
 # ==========================================
-# 🎨 VISTA 2: MUROS (CON GOTERO)
+# 🎨 VISTA 2: MUROS
 # ==========================================
 elif st.session_state.view == 'muros':
     st.button("⬅️ Volver al Inicio", on_click=lambda: set_view('home'))

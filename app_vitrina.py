@@ -88,9 +88,7 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     # --- 2. CÁLCULO DE ACABADOS (PAQUETE LLAVE EN MANO) ---
     costo_acabados = 0
     if tipo == "vivienda":
-        # Usamos el valor por m2 definido en el Sidebar
         valor_m2_acabado = P.get('valor_acabados_m2', 450000)
-        # El área de acabados suele ser el área de piso (aprox area_m2 / 3.5)
         area_piso = area_m2 / 3.5 
         costo_acabados = area_piso * valor_m2_acabado
 
@@ -112,7 +110,7 @@ def calcular_proyecto(area_m2, ml_muro=0, tipo="general", tiene_gotero=False):
     }
 
 # ==========================================
-# 📄 PDF GENERATOR (CONTRATO DETALLADO)
+# 📄 PDF GENERATOR (CORREGIDO)
 # ==========================================
 class PDF(FPDF):
     def header(self):
@@ -145,7 +143,7 @@ def generar_pdf(cliente, obra, datos, tipo="general", incluye_gotero=False):
     # SECCIÓN 2: PAQUETE DE ACABADOS (SOLO VIVIENDA)
     if tipo == "vivienda":
         pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "2. PAQUETE DE ACABADOS E INSTALACIONES", 0, 1)
-        pdf.set_font('Arial', '', 10) # Letra un poco más chica para que quepa todo
+        pdf.set_font('Arial', '', 10)
         texto_acabados = (
             "El valor 'Llave en Mano' incluye:\n"
             "A. INSTALACIONES: Red eléctrica interna (Puntos tomacorriente, interruptores y rosetas básicos norma RETIE). "
@@ -166,7 +164,10 @@ def generar_pdf(cliente, obra, datos, tipo="general", incluye_gotero=False):
     pdf.ln(10)
     pdf.set_font('Arial', 'I', 9)
     pdf.cell(0, 10, "Validez: 15 días. Excluye movimiento de tierras y viáticos.", 0, 1)
-    return pdf.output(dest='S').encode('latin-1')
+    
+    # --- CORRECCIÓN DEL BUG ---
+    # Convertimos el buffer a bytes directamente, sin encode
+    return bytes(pdf.output(dest='S'))
 
 # ==========================================
 # 🎛️ SIDEBAR
@@ -180,7 +181,7 @@ with st.sidebar:
         'arena_rio_m3': 98000, 'malla_5mm_m2': 28000, 
         'perfil_c18_ml': 11500, 'varilla_refuerzo_6m': 24000,
         'dia_cuadrilla': 250000, 'rendimiento_dia': 4.5,
-        'valor_acabados_m2': 450000 # <--- NUEVO ITEM: PAQUETE BAÑO/ELECTRICO/PISOS
+        'valor_acabados_m2': 450000 
     }
     if 'precios_reales' not in st.session_state: st.session_state['precios_reales'] = defaults
     if 'margen' not in st.session_state: st.session_state['margen'] = 30

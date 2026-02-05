@@ -128,7 +128,7 @@ def calcular_proyecto(input_data, tipo="general", tiene_gotero=False):
         }
 
 # ==========================================
-# 📄 PDF GENERATOR (DOSSIERS + COTIZACIÓN)
+# 📄 PDF GENERATOR
 # ==========================================
 class PDFBase(FPDF):
     def header(self):
@@ -145,110 +145,44 @@ def generar_pdf_cotizacion(cliente, obra, datos, desc):
     pdf.ln(5); pdf.set_font('Arial', 'I', 8); pdf.cell(0, 10, "Cálculo basado en Manual Técnico Ferrotek V7.0", 0, 1)
     return bytes(pdf.output(dest='S'))
 
-# --- NUEVA CLASE PARA DOSSIERS ---
 class PDFDossier(FPDF):
     def header(self):
-        self.set_font('Arial', 'B', 20)
-        self.set_text_color(50, 50, 50)
-        self.cell(0, 15, 'FERROTEK ®', 0, 1, 'L')
-        self.line(10, 25, 200, 25)
-        self.ln(10)
-    
+        self.set_font('Arial', 'B', 20); self.set_text_color(50, 50, 50)
+        self.cell(0, 15, 'FERROTEK ®', 0, 1, 'L'); self.line(10, 25, 200, 25); self.ln(10)
     def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(128)
+        self.set_y(-15); self.set_font('Arial', 'I', 8); self.set_text_color(128)
         self.cell(0, 10, 'Propiedad Intelectual de Manuel Enrique Prada F. - Innovación Colombiana', 0, 0, 'C')
 
 def generar_dossier_comercial():
-    pdf = PDFDossier()
-    pdf.add_page()
-    
-    # Título Principal
+    pdf = PDFDossier(); pdf.add_page()
     pdf.set_font('Arial', 'B', 24); pdf.set_text_color(0, 51, 102)
     pdf.cell(0, 10, 'MODELO "BÓVEDA EVOLUTIVA"', 0, 1, 'C')
     pdf.set_font('Arial', 'I', 14); pdf.set_text_color(80, 80, 80)
     pdf.cell(0, 10, 'La Revolución del Espacio en 60 m2', 0, 1, 'C'); pdf.ln(10)
-
-    # Cuerpo
-    pdf.set_font('Arial', 'B', 14); pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, '¿Cansado de la "Caja de Fósforos"?', 0, 1)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 6, "En Colombia, el lote tradicional de 6x10m se ha convertido en sinónimo de casas oscuras y calurosas. Techos planos de zinc que convierten su hogar en un horno.\n\nFERROTEK ROMPE EL MOLDE. Presentamos la Bóveda Evolutiva: Un diseño arquitectónico que utiliza la ingeniería de arcos para darle Espacio, Altura y Frescura.")
+    pdf.set_font('Arial', 'B', 14); pdf.set_text_color(0, 0, 0); pdf.cell(0, 10, '¿Cansado de la "Caja de Fósforos"?', 0, 1)
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, "En Colombia, el lote tradicional de 6x10m... (Texto Resumido para Dossier)... FERROTEK ROMPE EL MOLDE.")
     pdf.ln(5)
-
-    # Ficha Técnica
     pdf.set_font('Arial', 'B', 14); pdf.cell(0, 10, 'FICHA TÉCNICA: SU PRÓXIMO HOGAR', 0, 1)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 6, "- Área de Lote: 6.00m x 10.00m (60 m2)\n- Concepto: Tipo Loft (Sin columnas intermedias)\n- Altura: Doble altura con techo curvo\n\nDISTRIBUCIÓN INTELIGENTE:\n1. Zona Social Gigante: Sala-Comedor-Cocina integrados.\n2. Habitación Principal: Privada y fresca.\n3. El As bajo la manga (Mezzanine): Su casa viene lista para un segundo piso interior.")
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, "- Área: 60 m2\n- Altura: Doble altura curva\n- Distribución: Loft o Familiar (Mezzanine)")
     pdf.ln(5)
-
-    # Tecnología
     pdf.set_font('Arial', 'B', 14); pdf.cell(0, 10, 'TECNOLOGÍA Y CONFORT', 0, 1)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 6, "1. Thermo-Shield: Paredes que respiran con Zeolita. Hasta 4 grados más fresco.\n2. Acabado Piel de Roca: Monolítico, liso y sin pintura.\n3. Sismo-Resistencia: Jaula de seguridad de Acero Galvanizado.")
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, "1. Thermo-Shield (Zeolita)\n2. Acabado Piel de Roca\n3. Sismo-Resistencia Steel Frame")
     pdf.ln(10)
-
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, '¡VISITE NUESTRA CASA MODELO!', 0, 1, 'C')
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 5, 'Ubicación: Bucaramanga / Floridablanca', 0, 1, 'C')
-    
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, '¡VISITE NUESTRA CASA MODELO!', 0, 1, 'C')
     return bytes(pdf.output(dest='S'))
 
 def generar_dossier_tecnico():
-    pdf = PDFDossier()
-    pdf.add_page()
-    
-    # Título
-    pdf.set_font('Arial', 'B', 22); pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 10, 'SISTEMA CONSTRUCTIVO FERROTEK', 0, 1, 'C')
-    pdf.set_font('Arial', 'I', 12); pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 10, 'Híbrido de Alta Eficiencia: Steel Frame + Ferrocemento', 0, 1, 'C'); pdf.ln(10)
-
-    # Fundamento
-    pdf.set_font('Arial', 'B', 12); pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, 'FUNDAMENTO DE INGENIERÍA', 0, 1)
-    pdf.set_font('Arial', '', 10)
-    pdf.multi_cell(0, 5, "Ferrotek fusiona la precisión del Steel Framing (perfilería galvanizada PGC/PGU) con la resistencia monolítica del Ferrocemento. Resistimos por FORMA, no por PESO. Estructuras 50% más livianas que el hormigón, pero con resistencia al impacto superior.")
+    pdf = PDFDossier(); pdf.add_page()
+    pdf.set_font('Arial', 'B', 22); pdf.set_text_color(0, 51, 102); pdf.cell(0, 10, 'SISTEMA CONSTRUCTIVO FERROTEK', 0, 1, 'C')
+    pdf.set_font('Arial', 'I', 12); pdf.set_text_color(80, 80, 80); pdf.cell(0, 10, 'Híbrido: Steel Frame + Ferrocemento', 0, 1, 'C'); pdf.ln(10)
+    pdf.set_font('Arial', 'B', 12); pdf.set_text_color(0, 0, 0); pdf.cell(0, 10, 'FUNDAMENTO', 0, 1)
+    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Resistencia por FORMA, no por PESO. Estructuras 50% más livianas.")
     pdf.ln(5)
-
-    # Tabla Comparativa (Manual)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(40, 8, "VARIABLE", 1)
-    pdf.cell(75, 8, "TRADICIONAL (Mampostería)", 1)
-    pdf.cell(75, 8, "SISTEMA FERROTEK", 1, 1)
-    
+    pdf.set_font('Arial', 'B', 11); pdf.cell(40, 8, "VARIABLE", 1); pdf.cell(75, 8, "TRADICIONAL", 1); pdf.cell(75, 8, "FERROTEK", 1, 1)
     pdf.set_font('Arial', '', 10)
-    # Fila 1
-    pdf.cell(40, 8, "Velocidad", 1)
-    pdf.cell(75, 8, "Lenta (Fraguados, mucha mano de obra)", 1)
-    pdf.cell(75, 8, "Rápida (Montaje seco + Proyección)", 1, 1)
-    # Fila 2
-    pdf.cell(40, 8, "Peso", 1)
-    pdf.cell(75, 8, "Pesado (Requiere cimentación profunda)", 1)
-    pdf.cell(75, 8, "Liviano (Ideal suelos blandos/laderas)", 1, 1)
-    # Fila 3
-    pdf.cell(40, 8, "Desperdicio", 1)
-    pdf.cell(75, 8, "Alto (Escombros, rotura)", 1)
-    pdf.cell(75, 8, "Mínimo (Industrializado)", 1, 1)
-    # Fila 4
-    pdf.cell(40, 8, "Acabado", 1)
-    pdf.cell(75, 8, "Requiere repello, estuco y pintura", 1)
-    pdf.cell(75, 8, "Piel de Roca (Impermeable directo)", 1, 1)
-    
-    pdf.ln(5)
-
-    # Aplicaciones
-    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, 'APLICACIONES Y ESPECIFICACIONES', 0, 1)
-    pdf.set_font('Arial', '', 10)
-    pdf.multi_cell(0, 5, "1. VIVIENDA VIS/RURAL: El modelo Bóveda elimina la partida de cubierta (tejas).\n2. TANQUES: Impermeabilidad superior para cisternas sin fisuras.\n3. TURISMO: Arquitectura orgánica sin encofrados costosos.")
-    pdf.ln(3)
-    
-    pdf.set_font('Arial', 'B', 10); pdf.cell(0, 8, "COMPONENTES:", 0, 1)
-    pdf.set_font('Arial', '', 10)
-    pdf.multi_cell(0, 5, "- Esqueleto: Perfilería PGC 90mm Certificada (Z275).\n- Armadura: Malla Electrosoldada + Malla Zaranda.\n- Matriz: Mortero Alta Resistencia (Dosificación Batch 100) + Piel de Roca.")
-
+    pdf.cell(40, 8, "Velocidad", 1); pdf.cell(75, 8, "Lenta", 1); pdf.cell(75, 8, "Rápida (Industrializada)", 1, 1)
+    pdf.cell(40, 8, "Peso", 1); pdf.cell(75, 8, "Pesado", 1); pdf.cell(75, 8, "Liviano", 1, 1)
+    pdf.cell(40, 8, "Acabado", 1); pdf.cell(75, 8, "Requiere Pañete", 1); pdf.cell(75, 8, "Piel de Roca (Directo)", 1, 1)
     return bytes(pdf.output(dest='S'))
 
 # ==========================================
@@ -281,24 +215,16 @@ if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTA 1: HOME (CON ZONA DE DESCARGAS)
+# 🎨 VISTA 1: HOME
 # ==========================================
 if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Innovación Constructiva")
     st.subheader("Solidez de Roca, Precisión de Acero.")
     st.markdown("---")
-
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.info("### 🛡️ Sismo-Resistencia")
-        st.write("Estructura dúctil PGC 90mm que protege la vida.")
-    with c2:
-        st.success("### 🌡️ Termo-Acústico")
-        st.write("Núcleo aislante y Zeolita para confort superior.")
-    with c3:
-        st.warning("### 💧 Impermeabilidad")
-        st.write("Piel de Roca hidrofóbica sin mantenimiento.")
-
+    with c1: st.info("### 🛡️ Sismo-Resistencia"); st.write("Estructura dúctil PGC 90mm que protege la vida.")
+    with c2: st.success("### 🌡️ Termo-Acústico"); st.write("Núcleo aislante y Zeolita para confort superior.")
+    with c3: st.warning("### 💧 Impermeabilidad"); st.write("Piel de Roca hidrofóbica sin mantenimiento.")
     st.markdown("---")
     st.subheader("🚀 Cotizadores")
     b1, b2, b3, b4 = st.columns(4)
@@ -307,19 +233,11 @@ if st.session_state.view == 'home':
     with b3: st.button("🌾 Domos / Bóvedas", on_click=lambda: set_view('domos'), use_container_width=True)
     with b4: st.button("🏭 Planta de Mezclas", on_click=lambda: set_view('fabrica'), use_container_width=True)
     
-    # --- NUEVA ZONA DE DESCARGAS PÚBLICA ---
     st.markdown("---")
     st.subheader("📂 Centro de Documentación")
     col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        st.write("📄 **Para Clientes & Familias:**")
-        pdf_comercial = generar_dossier_comercial()
-        st.download_button("Descargar Dossier Comercial (Bóveda VIS)", pdf_comercial, "Ferrotek_Comercial.pdf", "application/pdf")
-    with col_d2:
-        st.write("📐 **Para Ingenieros & Inversionistas:**")
-        pdf_tecnico = generar_dossier_tecnico()
-        st.download_button("Descargar Ficha Técnica (Sistema)", pdf_tecnico, "Ferrotek_Tecnico.pdf", "application/pdf")
-    # ----------------------------------------
+    with col_d1: st.download_button("Descargar Dossier Comercial (Bóveda VIS)", generar_dossier_comercial(), "Ferrotek_Comercial.pdf", "application/pdf")
+    with col_d2: st.download_button("Descargar Ficha Técnica (Sistema)", generar_dossier_tecnico(), "Ferrotek_Tecnico.pdf", "application/pdf")
 
     st.markdown("---")
     imgs = [f for f in os.listdir('.') if f.endswith(('.png','.jpg'))]
@@ -334,18 +252,16 @@ if st.session_state.view == 'home':
 elif st.session_state.view == 'domos':
     st.button("⬅️ Volver", on_click=lambda: set_view('home'))
     st.header("🌾 Domos & Bóvedas Evolutivas")
-    
     c1, c2 = st.columns([1, 1.5]) 
     with c1:
         distribucion = st.radio("Modelo:", ["Open Loft (Turista)", "Familiar (2 Hab)"])
         ancho = st.number_input("Frente (m):", 6.0, disabled=True)
         fondo = st.number_input("Fondo (m):", 10.0)
-        
         data = calcular_proyecto({'ancho': ancho, 'fondo': fondo}, tipo="domo_boveda")
-        
         st.markdown("---")
         st.metric("Inversión Total", f"${data['precio']:,.0f}")
         
+        # --- DESGLOSE MOSTRADO CORRECTAMENTE ---
         if es_admin:
             st.warning("🕵️ RADIOGRAFÍA DE COSTOS (Privado)")
             col_d1, col_d2 = st.columns(2)
@@ -357,7 +273,6 @@ elif st.session_state.view == 'domos':
         if st.text_input("Cliente:"):
             desc = f"Modelo Domo/Bóveda Ferrotek V7. Dim: {ancho}x{fondo}m. Distribución: {distribucion}."
             st.download_button("Descargar Cotización", generar_pdf_cotizacion("Cliente", "Domo V7", data, desc), "cotizacion_domo.pdf")
-            
     with c2:
         if distribucion == "Open Loft (Turista)":
             try: st.image("Loft_rural.png", caption="Modelo Rural Ecoturismo", use_container_width=True)
@@ -367,7 +282,7 @@ elif st.session_state.view == 'domos':
             except: st.info("Imagen 'vis_familiar.png' no cargada.")
 
 # ==========================================
-# 🎨 VISTAS ESTÁNDAR
+# 🎨 VISTA: MUROS (CORREGIDO MO)
 # ==========================================
 elif st.session_state.view == 'muros':
     st.button("⬅️ Volver", on_click=lambda: set_view('home')); st.header("🛡️ Cotizador Muros")
@@ -376,12 +291,17 @@ elif st.session_state.view == 'muros':
     st.metric("Precio", f"${data['precio']:,.0f}")
     
     if es_admin:
-        st.warning("🕵️ DATA GERENCIAL")
-        st.write(f"Mat: ${data['desglose']['materiales']:,.0f} | MO: ${data['desglose']['mano_obra']:,.0f}")
-        st.success(f"Utilidad: ${data['utilidad']:,.0f}")
+        st.warning("🕵️ RADIOGRAFÍA DE COSTOS")
+        c1, c2 = st.columns(2)
+        c1.write(f"🔵 Materiales: ${data['desglose']['materiales']:,.0f}")
+        c1.write(f"👷 Mano de Obra: ${data['desglose']['mano_obra']:,.0f}")
+        c2.success(f"💰 Utilidad: ${data['utilidad']:,.0f}")
 
     if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cliente", "Muro", data, "Muro Perimetral Ferrotek"), "muro.pdf")
 
+# ==========================================
+# 🎨 VISTA: VIVIENDAS (CORREGIDO MO)
+# ==========================================
 elif st.session_state.view == 'viviendas':
     st.button("⬅️ Volver", on_click=lambda: set_view('home')); st.header("🏠 Cotizador Vivienda Recta")
     mod = st.selectbox("Modelo", ["Suite 30m2", "Familiar 54m2"])
@@ -390,9 +310,12 @@ elif st.session_state.view == 'viviendas':
     st.metric("Valor", f"${data['precio']:,.0f}")
     
     if es_admin:
-        st.warning("🕵️ DATA GERENCIAL")
-        st.write(f"Estructura: ${data['desglose']['materiales']:,.0f} | Acabados: ${data['desglose']['acabados']:,.0f}")
-        st.success(f"Utilidad: ${data['utilidad']:,.0f}")
+        st.warning("🕵️ RADIOGRAFÍA DE COSTOS")
+        c1, c2 = st.columns(2)
+        c1.write(f"🔵 Estructura (Mat): ${data['desglose']['materiales']:,.0f}")
+        c1.write(f"👷 Mano de Obra: ${data['desglose']['mano_obra']:,.0f}")
+        c2.write(f"🏠 Acabados: ${data['desglose']['acabados']:,.0f}")
+        c2.success(f"💰 Utilidad: ${data['utilidad']:,.0f}")
 
     if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cliente", mod, data, "Vivienda Unibody Recta"), "casa.pdf")
 

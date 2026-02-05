@@ -8,255 +8,190 @@ from datetime import datetime
 # ==========================================
 # ⚙️ CONFIGURACIÓN GENERAL
 # ==========================================
-st.set_page_config(page_title="Ferrotek | ERP Técnico 2024", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="Ferrotek | ERP Integral", page_icon="🏗️", layout="wide")
 
 # ==========================================
-# 🧪 MÓDULO FÁBRICA (NORMA 2024)
+# 🧪 MÓDULO FÁBRICA
 # ==========================================
-# Densidades aproximadas para conversión Vol -> Peso
-DENSIDAD = {
-    'cemento': 1.50, # kg/L
-    'arena': 1.60,   # kg/L
-    'cal': 0.55,     # kg/L (Liviana)
-    'carbonato': 0.80 # kg/L (Polvo fino)
-}
+DENSIDAD = {'cemento': 1.50, 'arena': 1.60, 'cal': 0.55}
 
-def calcular_produccion_lote(tipo_mezcla, cantidad_baldes_resultado):
-    """
-    Calcula la receta basada en el Cap. 3 del Manual Ferrotek.
-    Entrada: Cuántos baldes de mezcla final quieres preparar.
-    """
+def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg):
+    peso_meta = cantidad_bultos_30kg * 30
     insumos = {}
-    
-    # 3.1 MEZCLA A: RELLENO ESTRUCTURAL (Base)
-    # Proporción: 1 Cemento : 3 Arena (1.5 Gruesa + 1.5 Fina)
-    # Aditivo: 15% Carbonato respecto al peso del Cemento
-    if "A (Base)" in tipo_mezcla:
-        # Por cada unidad de volumen de Cemento, van 3 de Arena.
-        # Volumen Total Partes = 1 + 3 = 4 partes
-        factor = cantidad_baldes_resultado / 4 
-        
-        insumos['cemento_L'] = factor * 1
-        insumos['arena_L']   = factor * 3
-        insumos['cal_L']     = 0
-        
-        # Carbonato: 15% del PESO del cemento
-        peso_cemento = insumos['cemento_L'] * DENSIDAD['cemento']
-        peso_carbonato = peso_cemento * 0.15
-        insumos['carbonato_kg'] = peso_carbonato
-
-    # 3.2 MEZCLA B: ACABADO HIDROFÓBICO (Piel)
-    # Proporción: 1 Cemento : 3 Arena : 3 Cal
-    elif "B (Piel)" in tipo_mezcla:
-        # Volumen Total Partes = 1 + 3 + 3 = 7 partes
-        factor = cantidad_baldes_resultado / 7
-        
-        insumos['cemento_L'] = factor * 1
-        insumos['arena_L']   = factor * 3
-        insumos['cal_L']     = factor * 3
-        insumos['carbonato_kg'] = 0
-
-    # Conversión a Kilos para Bodega
-    insumos['arena_kg']   = insumos.get('arena_L', 0) * DENSIDAD['arena']
-    insumos['cemento_kg'] = insumos.get('cemento_L', 0) * DENSIDAD['cemento']
-    insumos['cal_kg']     = insumos.get('cal_L', 0) * DENSIDAD['cal']
-    
+    if "Relleno" in tipo_mezcla: 
+        peso_vol = (3 * DENSIDAD['arena']) + (1 * DENSIDAD['cemento'])
+        if peso_vol > 0:
+            units = peso_meta / peso_vol
+            insumos = {'arena_L': units*3, 'cemento_L': units*1, 'cal_L': 0}
+    elif "Acabado" in tipo_mezcla: 
+        peso_vol = (3 * DENSIDAD['arena']) + (3 * DENSIDAD['cal']) + (1 * DENSIDAD['cemento'])
+        if peso_vol > 0:
+            units = peso_meta / peso_vol
+            insumos = {'arena_L': units*3, 'cal_L': units*3, 'cemento_L': units*1}
+    if not insumos: return {}
+    insumos['arena_kg'] = insumos['arena_L'] * DENSIDAD['arena']
+    insumos['cemento_kg'] = insumos['cemento_L'] * DENSIDAD['cemento']
+    insumos['cal_kg'] = insumos.get('cal_L', 0) * DENSIDAD['cal']
     return insumos
 
 # ==========================================
-# 🧠 MOTOR DE COSTOS (NORMA TÉCNICA)
+# 🧠 MOTOR DE COSTOS
 # ==========================================
-def calcular_proyecto(area_m2, ml_muro=0, tipo="general", altura_muro=2.44):
+def calcular_proyecto(input_data, tipo="general", tiene_gotero=False):
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
-    # --- 1. ESTRUCTURA METÁLICA (SEGÚN ANEXO) ---
-    # Perfil PGC (Montantes): Separación máx 40cm 
-    # Cantidad: (Metros lineales muro / 0.40) + Arranque
-    # Pero el manual da un consumo estimado de 3.5 ml/m2 
-    # Usaremos el valor del manual para ser precisos.
-    consumo_pgc = area_m2 * 3.5
-    
-    # Perfil PGU (Soleras): 1.2 ml/m2 
-    consumo_pgu = area_m2 * 1.2
-    
-    # Tornillos T2 Wafer: 25 un/m2 
-    consumo_tornillos = math.ceil(area_m2 * 25)
+    # --- CASO VIS BÓVEDA ---
+    if tipo == "boveda_vis":
+        ancho = input_data['ancho']; fondo = input_data['fondo']
+        radio = ancho / 2.0 
+        long_arco = math.pi * radio 
+        area_total_envolvente = (long_arco * fondo) + ((math.pi * (radio**2))) # Cubierta + Tímpanos
+        
+        # Estructura
+        total_pgc = ((math.ceil(fondo/0.6)+1) * long_arco) + (((math.pi*(radio**2))) * 3.5)
+        
+        # Envolvente
+        costo_mat = (
+            (total_pgc * P['perfil_c18_ml']) +
+            ((area_total_envolvente * 0.05 * 1.05 * 350 / 50) * P['cemento_gris_50kg']) + # Cemento
+            (area_total_envolvente * 0.05 * 1.05 * 1.1 * P['arena_rio_m3']) + # Arena
+            (area_total_envolvente * 2.1 * P['malla_5mm_m2']) + # Mallas
+            ((long_arco * fondo) * P.get('aislante_m2', 12000)) + # Aislante
+            (area_total_envolvente * 5000) # Varios
+        )
+        costo_mo = math.ceil((ancho*fondo)/2.5) * P['dia_cuadrilla']
+        costo_acabados = (ancho*fondo) * P.get('valor_acabados_vis_m2', 350000)
+        
+        costo_total = costo_mat + costo_mo + costo_acabados
+        return {"precio": costo_total/(1-margen), "utilidad": (costo_total/(1-margen))-costo_total}
 
-    # --- 2. PIEL Y REFUERZO ---
-    # Malla Electrosoldada: 1.10 m2/m2 (10% traslape) 
-    consumo_malla_elec = area_m2 * 1.10
-    
-    # Malla Zaranda: 1.25 m2/m2 (Traslape óptimo 15cm) 
-    consumo_malla_zar = area_m2 * 1.25
-
-    # --- 3. MORTEROS (VOLÚMENES EXACTOS CAP. 2) ---
-    # Espesor Capa 1: 1.5 cm [cite: 43] -> 0.015 m3/m2
-    vol_capa_A = area_m2 * 0.015 
-    
-    # Espesor Capa 2: 1.5 cm [cite: 46] -> 0.015 m3/m2
-    vol_capa_B = area_m2 * 0.015
-    
-    # --- 4. DESGLOSE DE MATERIALES (RECETAS) ---
-    
-    # Mezcla A (1:3 + Carbonato)
-    # Rendimiento aprox: 1 m3 mortero 1:3 consume ~450kg cemento y 1.1m3 arena
-    cemento_A_kg = vol_capa_A * 450
-    arena_A_m3   = vol_capa_A * 1.1
-    carbonato_kg = cemento_A_kg * 0.15 # 
-    
-    # Mezcla B (1:3:3)
-    # Rendimiento aprox: 1 m3 mortero 1:3:3 consume ~300kg cemento, 300kg cal, 1m3 arena
-    cemento_B_kg = vol_capa_B * 300
-    cal_B_kg     = vol_capa_B * 300 # La cal pesa menos, pero ocupa mucho volumen
-    arena_B_m3   = vol_capa_B * 1.0
-
-    # TOTALES DE COMPRA
-    total_cemento_kg = cemento_A_kg + cemento_B_kg
-    total_arena_m3   = arena_A_m3 + arena_B_m3
-    total_cal_kg     = cal_B_kg
-    total_carb_kg    = carbonato_kg
-    
-    # --- 5. COSTOS DIRECTOS ---
-    costo_mat = (
-        (consumo_pgc * P['perfil_pgc_ml']) +
-        (consumo_pgu * P['perfil_pgu_ml']) +
-        (consumo_tornillos * P['tornillo_t2_un']) +
-        (consumo_malla_elec * P['malla_electro_m2']) +
-        (consumo_malla_zar * P['malla_zaranda_m2']) +
-        ((total_cemento_kg / 50) * P['cemento_50kg']) +
-        ((total_cal_kg / 25) * P['cal_25kg']) +
-        (total_arena_m3 * P['arena_m3']) +
-        (total_carb_kg * P['carbonato_kg']) +
-        (area_m2 * 2000) # Agua y varios menores
-    )
-    
-    rendimiento = P.get('rendimiento_dia', 4.5)
-    dias = math.ceil(area_m2 / rendimiento)
-    costo_mo = dias * P['dia_cuadrilla']
-    
-    costo_total = costo_mat + costo_mo
-    precio_venta = costo_total / (1 - margen)
-    
-    return {
-        "precio": precio_venta, 
-        "costo": costo_total,
-        "utilidad": precio_venta - costo_total,
-        "cantidades": {
-            "PGC (ml)": consumo_pgc,
-            "PGU (ml)": consumo_pgu,
-            "Tornillos (un)": consumo_tornillos,
-            "Cemento (kg)": total_cemento_kg,
-            "Carbonato (kg)": total_carb_kg
-        }
-    }
+    # --- CASO GENERAL ---
+    else:
+        area_m2 = input_data['area']; ml_muro_val = input_data.get('ml', 0)
+        espesor = 0.06 if tipo=="estanque" else 0.055 if tipo=="vivienda" else 0.04
+        fac_malla = 1.6 if tipo=="vivienda" else 2.1
+        varilla = area_m2*1.5 if tipo=="estanque" else 0
+        
+        vol = area_m2 * espesor * 1.05
+        costo_mat = (
+            (math.ceil(vol*0.7*8.5) * P['cemento_gris_50kg']) +
+            (math.ceil(vol*0.3*10) * P['cal_hidratada_25kg']) +
+            (vol*1.1 * P['arena_rio_m3']) +
+            (area_m2 * fac_malla * P['malla_5mm_m2']) +
+            (area_m2 * 0.9 * P['perfil_c18_ml']) +
+            (math.ceil(varilla) * P.get('varilla_refuerzo_6m', 24000)) +
+            (area_m2 * 5000)
+        )
+        mo = math.ceil(area_m2/P.get('rendimiento_dia', 4.5)) * P['dia_cuadrilla']
+        extra = ml_muro_val * 25000 if tiene_gotero else 0
+        acabados = (area_m2/3.5 * P.get('valor_acabados_m2', 450000)) if tipo=="vivienda" else 0
+        
+        total = costo_mat + mo + extra + acabados
+        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total}
 
 # ==========================================
-# 🎛️ SIDEBAR (PRECIOS ACTUALIZADOS)
+# 📄 PDF GENERATOR
+# ==========================================
+class PDF(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 16); self.cell(0, 10, 'FERROTEK S.A.S', 0, 1, 'C')
+        self.set_font('Arial', 'I', 10); self.cell(0, 10, 'Ingeniería Unibody', 0, 1, 'C'); self.ln(10)
+
+def generar_pdf(cliente, obra, datos, desc):
+    pdf = PDF(); pdf.add_page(); pdf.set_font('Arial', '', 12)
+    pdf.cell(0, 10, f"Cliente: {cliente} | Fecha: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
+    pdf.cell(0, 10, f"Proyecto: {obra}", 0, 1); pdf.ln(5)
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, "ESPECIFICACIONES", 0, 1)
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 7, desc); pdf.ln(5)
+    pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, f"INVERSIÓN: ${datos['precio']:,.0f}", 0, 1)
+    return bytes(pdf.output(dest='S'))
+
+# ==========================================
+# 🎛️ SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("🎛️ Panel Gerente")
     pwd = st.text_input("Contraseña:", type="password")
-    
-    # Precios Base (¡AGREGAMOS LOS NUEVOS!)
     defaults = {
-        'cemento_50kg': 29500, 
-        'cal_25kg': 25000, 
-        'arena_m3': 98000, 
-        'carbonato_kg': 1500, # Precio estimado del carbonato/filler
-        'malla_electro_m2': 18000, 
-        'malla_zaranda_m2': 5000,
-        'perfil_pgc_ml': 18000, # Perfil estructural 90/60
-        'perfil_pgu_ml': 14000, 
-        'tornillo_t2_un': 80,   # Precio unitario tornillo
-        'dia_cuadrilla': 250000, 
-        'rendimiento_dia': 4.5
+        'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000, 'arena_rio_m3': 98000, 
+        'malla_5mm_m2': 28000, 'perfil_c18_ml': 11500, 'varilla_refuerzo_6m': 24000,
+        'aislante_m2': 12000, 'dia_cuadrilla': 250000, 'rendimiento_dia': 4.5,
+        'valor_acabados_m2': 450000, 'valor_acabados_vis_m2': 350000 
     }
     if 'precios_reales' not in st.session_state: st.session_state['precios_reales'] = defaults
     if 'margen' not in st.session_state: st.session_state['margen'] = 30
-    
     es_admin = (pwd == "ferrotek2026")
     if es_admin:
-        st.success("🔓 Admin Activo")
-        margen = st.slider("Utilidad %", 0, 60, st.session_state['margen'])
-        st.session_state['margen'] = margen
-        with st.expander("Costos Insumos"):
-            edited = st.data_editor(st.session_state['precios_reales'], key="p_edit", num_rows="fixed")
-            st.session_state['precios_reales'] = edited
+        st.session_state['margen'] = st.slider("Utilidad %", 0, 60, st.session_state['margen'])
+        st.session_state['precios_reales'] = st.data_editor(st.session_state['precios_reales'], key="p_edit")
 
 if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
 
 # ==========================================
-# 🎨 VISTA 1: HOME
+# 🎨 VISTAS
 # ==========================================
 if st.session_state.view == 'home':
-    st.title("🏗️ FERROTEK: Sistema Híbrido 2024")
-    st.subheader("Acero Galvanizado + Ferrocemento de Alta Resistencia")
+    st.title("🏗️ FERROTEK: Ingeniería Monolítica")
     st.markdown("---")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.info("### 📘 Manual Técnico")
-        st.write("Cálculos basados en Norma 2024: PGC @ 40cm, Mezclas Densificadas con Carbonato.")
-    with c2:
-        st.success("### 🧪 Dosificación Exacta")
-        st.write("Recetas separadas para Relleno Estructural y Piel Hidrofóbica.")
-
-    st.markdown("---")
+    b1, b2, b3, b4 = st.columns(4)
+    with b1: st.button("🛡️ Muros", on_click=lambda: set_view('muros'), use_container_width=True)
+    with b2: st.button("🏠 Viviendas", on_click=lambda: set_view('viviendas'), use_container_width=True)
+    with b3: st.button("🌾 Bóveda VIS", on_click=lambda: set_view('vis_boveda'), use_container_width=True)
+    with b4: st.button("🏭 Fábrica", on_click=lambda: set_view('fabrica'), use_container_width=True)
     
-    b1, b2 = st.columns(2)
-    with b1: 
-        if st.button("🛡️ Cotizar Muros (Norma)", key="nav_m", use_container_width=True): set_view('muros')
-    with b2:
-        if st.button("🏭 Fábrica de Mezclas", key="nav_f", use_container_width=True): set_view('fabrica')
+    # GALERÍA AUTOMÁTICA
+    st.markdown("---"); st.subheader("📸 Galería Reciente")
+    imgs = [f for f in os.listdir('.') if f.endswith(('.png','.jpg'))]
+    if imgs:
+        c = st.columns(3)
+        for i, f in enumerate(imgs): c[i%3].image(f, caption=f, use_container_width=True)
 
-# ==========================================
-# 🎨 VISTA 2: MUROS
-# ==========================================
-elif st.session_state.view == 'muros':
+elif st.session_state.view == 'vis_boveda':
     st.button("⬅️ Inicio", on_click=lambda: set_view('home'))
-    st.header("🛡️ Cotizador Muros (Estándar 2024)")
+    st.header("🌾 Bóveda Evolutiva (Manual V.2)")
     
-    ml = st.number_input("Metros Lineales:", value=10.0)
-    altura = st.number_input("Altura (m):", value=2.44)
-    area = ml * altura
+    c1, c2 = st.columns([1, 1.5]) # Columna 2 más ancha para la foto
     
-    data = calcular_proyecto(area)
-    
-    c1, c2 = st.columns(2)
     with c1:
-        st.metric("Precio Venta", f"${data['precio']:,.0f}")
-        st.caption(f"Área: {area:.1f} m2")
+        distribucion = st.radio("Distribución Interna:", ["Open Loft (Turista)", "Familiar (2 Hab)"])
+        ancho = st.number_input("Frente (m):", 6.0, disabled=True)
+        fondo = st.number_input("Fondo (m):", 10.0)
+        data = calcular_proyecto({'ancho': ancho, 'fondo': fondo}, tipo="boveda_vis")
+        st.metric("Inversión Total", f"${data['precio']:,.0f}")
+        st.info("✅ Piel de Roca Impermeable (Sin mantenimientos)")
         
-        if es_admin:
-            st.warning("📊 INSUMOS REQUERIDOS (Manual Cap. 4)")
-            st.write(f"- Perfil PGC: {data['cantidades']['PGC (ml)']:.1f} ml")
-            st.write(f"- Perfil PGU: {data['cantidades']['PGU (ml)']:.1f} ml")
-            st.write(f"- Tornillos T2: {data['cantidades']['Tornillos (un)']} un")
-            st.write(f"- Carbonato Calcio: {data['cantidades']['Carbonato (kg)']:.1f} kg")
+        if st.text_input("Cliente:"):
+            desc = f"Modelo VIS Bóveda. Distribución: {distribucion}. Estructura curva Ferrotek."
+            st.download_button("Descargar Cotización", generar_pdf("Cliente", "Bóveda 60m2", data, desc), "cotizacion.pdf")
 
-# ==========================================
-# 🎨 VISTA 3: FÁBRICA
-# ==========================================
+    with c2:
+        # LÓGICA DE FOTOS DINÁMICAS
+        if distribucion == "Open Loft (Turista)":
+            try: st.image("vis_loft.png", caption="Espacio Abierto - Ideal Glamping", use_container_width=True)
+            except: st.warning("Sube la foto 'vis_loft.png'")
+        else:
+            try: st.image("vis_familiar.png", caption="Mezzanine Dividido - Familiar", use_container_width=True)
+            except: st.warning("Sube la foto 'vis_familiar.png'")
+
+elif st.session_state.view == 'muros':
+    st.button("⬅️ Inicio", on_click=lambda: set_view('home')); st.header("🛡️ Cotizador Muros")
+    ml = st.number_input("Metros Lineales:", 50.0); got = st.checkbox("Gotero", True)
+    data = calcular_proyecto({'area': ml*2.2, 'ml': ml}, tipo="muro", tiene_gotero=got)
+    st.metric("Precio", f"${data['precio']:,.0f}")
+    if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf("Cliente", "Muro", data, "Muro Perimetral Ferrotek"), "muro.pdf")
+
+elif st.session_state.view == 'viviendas':
+    st.button("⬅️ Inicio", on_click=lambda: set_view('home')); st.header("🏠 Cotizador Vivienda")
+    mod = st.selectbox("Modelo", ["Suite 30m2", "Familiar 54m2"])
+    area = int(mod.split()[1].replace("m2","")) * 3.5
+    data = calcular_proyecto({'area': area}, tipo="vivienda")
+    st.metric("Valor", f"${data['precio']:,.0f}")
+    if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf("Cliente", mod, data, "Vivienda Unibody"), "casa.pdf")
+
 elif st.session_state.view == 'fabrica':
-    st.button("⬅️ Inicio", on_click=lambda: set_view('home'))
-    st.header("🏭 Dosificación de Mezclas (Cap. 3)")
-    
-    tipo = st.selectbox("Tipo de Mezcla:", ["A (Base) - Relleno Estructural", "B (Piel) - Acabado Hidrofóbico"])
-    baldes = st.number_input("¿Cuántos baldes de mezcla necesita?", value=10)
-    
-    res = calcular_produccion_lote(tipo, baldes)
-    
-    st.markdown("### 📋 Receta:")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Cemento", f"{res.get('cemento_L',0):.1f}", "Baldes")
-    c2.metric("Arena", f"{res.get('arena_L',0):.1f}", "Baldes")
-    
-    if res.get('cal_L', 0) > 0:
-        c3.metric("Cal", f"{res.get('cal_L',0):.1f}", "Baldes")
-    elif res.get('carbonato_kg', 0) > 0:
-        c3.metric("Carbonato", f"{res.get('carbonato_kg',0):.2f}", "KILOS (Pesados)")
-        st.info("⚠️ OJO: El Carbonato se pesa, no se mide en baldes.")
-
-    st.caption("Nota: 'Arena' incluye 50% Gruesa y 50% Fina según Cap 3.1.")
+    st.button("⬅️ Inicio", on_click=lambda: set_view('home')); st.header("🏭 Fábrica")
+    tipo = st.radio("Mezcla:", ["Relleno", "Acabado"]); qty = st.number_input("Bultos:", 10)
+    res = calcular_produccion_lote(tipo, qty)
+    if res: st.write(res)

@@ -172,17 +172,140 @@ def generar_dossier_comercial():
     return bytes(pdf.output(dest='S'))
 
 def generar_dossier_tecnico():
-    pdf = PDFDossier(); pdf.add_page()
-    pdf.set_font('Arial', 'B', 22); pdf.set_text_color(0, 51, 102); pdf.cell(0, 10, 'SISTEMA CONSTRUCTIVO FERROTEK', 0, 1, 'C')
-    pdf.set_font('Arial', 'I', 12); pdf.set_text_color(80, 80, 80); pdf.cell(0, 10, 'Híbrido: Steel Frame + Ferrocemento', 0, 1, 'C'); pdf.ln(10)
-    pdf.set_font('Arial', 'B', 12); pdf.set_text_color(0, 0, 0); pdf.cell(0, 10, 'FUNDAMENTO', 0, 1)
-    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Resistencia por FORMA, no por PESO. Estructuras 50% más livianas.")
+    pdf = PDFDossier()
+    
+    # ==========================================
+    # PÁGINA 1: FUNDAMENTOS Y COMPARATIVA
+    # ==========================================
+    pdf.add_page()
+    
+    # 1. TÍTULO E INTRODUCCIÓN
+    pdf.set_font('Arial', 'B', 20)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, 'SISTEMA CONSTRUCTIVO FERROTEK ®', 0, 1, 'C')
+    
+    pdf.set_font('Arial', 'I', 12)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(0, 8, 'Híbrido de Alta Eficiencia: Steel Frame + Ferrocemento', 0, 1, 'C')
     pdf.ln(5)
-    pdf.set_font('Arial', 'B', 11); pdf.cell(40, 8, "VARIABLE", 1); pdf.cell(75, 8, "TRADICIONAL", 1); pdf.cell(75, 8, "FERROTEK", 1, 1)
+
+    # 2. DEFINICIÓN TÉCNICA (TEXTO COMPLETO)
+    pdf.set_font('Arial', 'B', 12); pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, '1. FUNDAMENTO DE INGENIERÍA', 0, 1)
+    
     pdf.set_font('Arial', '', 10)
-    pdf.cell(40, 8, "Velocidad", 1); pdf.cell(75, 8, "Lenta", 1); pdf.cell(75, 8, "Rápida (Industrializada)", 1, 1)
-    pdf.cell(40, 8, "Peso", 1); pdf.cell(75, 8, "Pesado", 1); pdf.cell(75, 8, "Liviano", 1, 1)
-    pdf.cell(40, 8, "Acabado", 1); pdf.cell(75, 8, "Requiere Pañete", 1); pdf.cell(75, 8, "Piel de Roca (Directo)", 1, 1)
+    pdf.multi_cell(0, 5, 
+        "Ferrotek no es un material, es una tecnología de composición. Fusionamos la precisión industrial del Steel Framing (perfilería galvanizada PGC/PGU) con la versatilidad y resistencia monolítica del Ferrocemento.\n\n"
+        "EL PRINCIPIO: RESISTENCIA POR FORMA\n"
+        "A diferencia de la construcción tradicional que resiste por gravedad (masa/peso), Ferrotek resiste por forma y continuidad estructural. Creamos cáscaras delgadas (3 a 5 cm) de alta densidad, reforzadas con acero bidireccional.\n"
+        "RESULTADO: Estructuras 50% más livianas que el hormigón, pero con una tenacidad superior ante sismos.")
+    pdf.ln(8)
+
+    # 3. TABLA COMPARATIVA (DETALLADA)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 8, '2. VENTAJAS COMPETITIVAS (Cuadro Comparativo)', 0, 1)
+    pdf.ln(2)
+
+    # Configuración de columnas
+    col_var = 35
+    col_trad = 75
+    col_ferro = 75
+    h_line = 6
+    
+    # Encabezado Tabla
+    pdf.set_font('Arial', 'B', 10); pdf.set_fill_color(230, 230, 230)
+    pdf.cell(col_var, 8, "VARIABLE", 1, 0, 'C', 1)
+    pdf.cell(col_trad, 8, "TRADICIONAL (Mampostería)", 1, 0, 'C', 1)
+    pdf.cell(col_ferro, 8, "SISTEMA FERROTEK", 1, 1, 'C', 1)
+    
+    # Filas con Multi-cell manual para evitar desbordes
+    pdf.set_font('Arial', '', 9)
+    
+    # Fila 1: Velocidad
+    y_before = pdf.get_y()
+    pdf.cell(col_var, 12, "VELOCIDAD", 1, 0, 'C')
+    pdf.set_xy(10 + col_var, y_before)
+    pdf.multi_cell(col_trad, 6, "LENTA\n(Fraguados largos, mucha mano de obra)", 1, 'C')
+    pdf.set_xy(10 + col_var + col_trad, y_before)
+    pdf.multi_cell(col_ferro, 6, "RÁPIDA\n(Montaje en seco + Proyección)", 1, 'C')
+    
+    # Fila 2: Peso
+    y_before = pdf.get_y()
+    pdf.cell(col_var, 12, "PESO", 1, 0, 'C')
+    pdf.set_xy(10 + col_var, y_before)
+    pdf.multi_cell(col_trad, 6, "PESADO\n(Requiere cimentación profunda)", 1, 'C')
+    pdf.set_xy(10 + col_var + col_trad, y_before)
+    pdf.multi_cell(col_ferro, 6, "LIVIANO\n(Ideal suelos blandos o laderas)", 1, 'C')
+
+    # Fila 3: Desperdicio
+    y_before = pdf.get_y()
+    pdf.cell(col_var, 12, "DESPERDICIO", 1, 0, 'C')
+    pdf.set_xy(10 + col_var, y_before)
+    pdf.multi_cell(col_trad, 6, "ALTO\n(Escombros, rotura de bloque)", 1, 'C')
+    pdf.set_xy(10 + col_var + col_trad, y_before)
+    pdf.multi_cell(col_ferro, 6, "MÍNIMO\n(Industrializado y corte a medida)", 1, 'C')
+
+    # Fila 4: Acabado
+    y_before = pdf.get_y()
+    pdf.cell(col_var, 12, "ACABADO", 1, 0, 'C')
+    pdf.set_xy(10 + col_var, y_before)
+    pdf.multi_cell(col_trad, 6, "COSTOSO\n(Requiere repello, estuco y pintura)", 1, 'C')
+    pdf.set_xy(10 + col_var + col_trad, y_before)
+    pdf.multi_cell(col_ferro, 6, "PIEL DE ROCA\n(Acabado directo e impermeable)", 1, 'C')
+    
+    pdf.ln(10)
+
+    # ==========================================
+    # PÁGINA 2: APLICACIONES Y ESPECIFICACIONES
+    # ==========================================
+    pdf.add_page()
+    
+    # 4. APLICACIONES Y VERSATILIDAD
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, '3. APLICACIONES Y VERSATILIDAD', 0, 1)
+    
+    pdf.set_font('Arial', 'B', 10); pdf.write(5, "A. VIVIENDA SOCIAL (VIS/VIP): ")
+    pdf.set_font('Arial', '', 10)
+    pdf.write(5, "Nuestro modelo de Bóveda elimina la partida de 'Cubierta' (cerchas y tejas), reduciendo drásticamente los costos directos y el mantenimiento futuro.\n\n")
+    
+    pdf.set_font('Arial', 'B', 10); pdf.write(5, "B. INFRAESTRUCTURA RURAL (TANQUES): ")
+    pdf.set_font('Arial', '', 10)
+    pdf.write(5, "Gracias a la impermeabilidad superior del ferrocemento (alta densidad + mallas), Ferrotek es líder en Cisternas y Tanques sin el riesgo de fisuras del concreto.\n\n")
+
+    pdf.set_font('Arial', 'B', 10); pdf.write(5, "C. TURISMO (GLAMPING): ")
+    pdf.set_font('Arial', '', 10)
+    pdf.write(5, "Capacidad de generar formas curvas y cúpulas orgánicas sin encofrados costosos. Alto impacto visual.\n\n")
+    
+    pdf.ln(5)
+
+    # 5. ESPECIFICACIONES TÉCNICAS (COMPONENTES)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.rect(10, pdf.get_y(), 190, 45, 'F')
+    pdf.set_xy(15, pdf.get_y()+5)
+    
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 8, '4. ESPECIFICACIONES DEL SISTEMA (Resumen)', 0, 1)
+    
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(180, 6, 
+        "• ESQUELETO: Perfilería PGC 90mm certificada (Acero Galvanizado Z275).\n"
+        "• ARMADURA: Malla Electrosoldada 15x15 + Malla Zaranda (Tejida fina).\n"
+        "• MATRIZ: Mortero de Alta Resistencia (Dosificación Batch 100).\n"
+        "• ACABADO: Tecnología 'Piel de Roca' (Cal Hidratada + Fibras).")
+    
+    pdf.ln(20)
+    
+    # 6. PIE DE PÁGINA / CONTACTO
+    pdf.set_draw_color(150, 150, 150)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "¿Interesado en implementar Ferrotek?", 0, 1, 'C')
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 6, "Contacto Comercial y Asesoría Técnica", 0, 1, 'C')
+    pdf.cell(0, 6, "Bucaramanga, Santander - Colombia", 0, 1, 'C')
+
     return bytes(pdf.output(dest='S'))
 
 # ==========================================

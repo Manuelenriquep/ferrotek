@@ -38,19 +38,17 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
-    lista_mat = [] # Lista de materiales detallada
+    lista_mat = [] 
     
     # --- DOMOS ---
     if linea_negocio == "domo":
         ancho = input_data['ancho']; fondo = input_data['fondo']
         alt_m = 0.80; radio = ancho/2.0; alt_c = alt_m + radio 
         
-        # Geometría
         perim_arco = (math.pi * radio) + (alt_m * 2)
         area_timp = (math.pi * radio**2) + (2 * ancho * alt_m)
         area_tot = (perim_arco * fondo) + area_timp
         
-        # Cantidades Físicas (Cálculo Real)
         num_arcos = math.ceil(fondo/0.6) + 1
         ml_pgc_tot = (num_arcos * perim_arco) + (area_timp * 3.5)
         cant_tubos = math.ceil(ml_pgc_tot / 6.0)
@@ -58,7 +56,6 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         cant_cemento = math.ceil(area_tot * 0.35) 
         cant_arena = math.ceil(area_tot * 0.05)
         
-        # Lista Valorizada
         lista_mat = [
             {"Insumo": "Perfil PGC 90 (6m)", "Cant": cant_tubos, "Unid": "Tubos", "Costo": cant_tubos * 6 * P['perfil_pgc90_ml']},
             {"Insumo": "Malla 5mm", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla * P['malla_5mm_m2']},
@@ -67,7 +64,7 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
             {"Insumo": "Tornillería/Anclajes", "Cant": 1, "Unid": "Global", "Costo": area_tot * 4000}
         ]
         
-        c_mat = sum([item['Costo'] for item in lista_mat]) # Suma exacta
+        c_mat = sum([item['Costo'] for item in lista_mat]) 
         c_mo = math.ceil(ancho*fondo/2.0) * P['dia_cuadrilla']
         c_acab = (ancho*fondo * P.get('valor_acabados_vis_m2', 350000)) if incluye_acabados else 0
         
@@ -89,7 +86,6 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         cant_malla = math.ceil(area * f_malla)
         cant_cemento = math.ceil(area * f_cem)
         
-        # Cimentación
         vol_cinta = ml * 0.20 * 0.25
         cant_cem_cim = math.ceil(vol_cinta * 7)
         cant_arena_cim = vol_cinta * 1.1
@@ -135,7 +131,7 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
             {"Insumo": "Arena/Triturado", "Cant": math.ceil(area*0.2), "Unid": "m3", "Costo": math.ceil(area*0.2)*P['arena_rio_m3']}
         ]
         
-        c_mat = sum([item['Costo'] for item in lista_mat]) # Auditoría OK
+        c_mat = sum([item['Costo'] for item in lista_mat]) 
         c_mo = area * P['dia_cuadrilla'] * 1.1
         c_acab = (area * P['valor_acabados_m2']) if incluye_acabados else 0
         
@@ -267,9 +263,12 @@ elif st.session_state.view == 'casas':
             mostrar_desglose(data_t)
             if st.text_input("Cliente Tradicional:", key="cli_t"):
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, mod_t), "cot_trad.pdf")
-        with c2: st.info("Techo PVC Colonial, Aleros.")
-        try: st.image("vis_familiar.png", width=400)
-        except: pass
+        with c2: 
+            st.info("Techo PVC Colonial, Aleros.")
+            try:
+                st.image("vis_familiar.png", width=400)
+            except:
+                pass
 
     with tab_mod:
         c1, c2 = st.columns(2)
@@ -282,9 +281,12 @@ elif st.session_state.view == 'casas':
             mostrar_desglose(data_m)
             if st.text_input("Cliente Serie M:", key="cli_m"):
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, mod_m), "cot_mod.pdf")
-        with c2: st.success("Diseño Cúbico, Wet-Wall.")
-        try: st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400)
-        except: pass
+        with c2: 
+            st.success("Diseño Cúbico, Wet-Wall.")
+            try:
+                st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400)
+            except:
+                pass
 
 # --- MUROS ---
 elif st.session_state.view == 'muros':
@@ -299,7 +301,10 @@ elif st.session_state.view == 'muros':
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Muro", data, f"{tipo}"), "cot.pdf")
     with c2: 
         st.info("Cerramientos de alta resistencia.")
-        try: st.image("muro_perimetral.png", use_container_width=True); except: pass
+        try:
+            st.image("muro_perimetral.png", use_container_width=True)
+        except:
+            pass
 
 # --- DOMOS ---
 elif st.session_state.view == 'domos':
@@ -316,7 +321,10 @@ elif st.session_state.view == 'domos':
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Domo", data, f"{ancho}x{fondo}m"), "cot.pdf")
     with c2: 
         st.success(f"Altura: {data['geo']['h']:.2f}m")
-        try: st.image("Loft_rural.png", use_container_width=True); except: pass
+        try:
+            st.image("Loft_rural.png", use_container_width=True)
+        except:
+            pass
 
 # --- AGUA ---
 elif st.session_state.view == 'agua':

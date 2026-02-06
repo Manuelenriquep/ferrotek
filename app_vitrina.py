@@ -32,7 +32,7 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg_meta):
     return insumos
 
 # ==========================================
-# 3. MOTOR DE COSTOS DETALLADO (V120)
+# 3. MOTOR DE COSTOS DETALLADO (V121)
 # ==========================================
 def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True):
     P = st.session_state['precios_reales']
@@ -59,10 +59,10 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         lista_mat = [
             {"Insumo": "Perfil Estructural PGC 90x40 Cal.22 (6m)", "Cant": cant_tubos, "Unid": "Tubos", "Costo": cant_tubos * 6 * P['perfil_pgc90_ml']},
             {"Insumo": "Malla Electrosoldada 5mm (15x15)", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla * P['malla_5mm_m2']},
-            {"Insumo": "Malla Zaranda (Gallinero) Cal.24", "Cant": cant_malla, "Unid": "m2", "Costo": 0}, # Costo incluido en miscelaneos o agregar item precio
             {"Insumo": "Cemento Estructural (Tipo ART)", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento * P['cemento_gris_50kg']},
             {"Insumo": "Arena de Río Lavada", "Cant": cant_arena, "Unid": "m3", "Costo": cant_arena * P['arena_rio_m3']},
-            {"Insumo": "Tornillería Wafer/Extraplanos", "Cant": math.ceil(area_tot*40), "Unid": "Und", "Costo": area_tot * 4000}
+            {"Insumo": "Tornillería Wafer/Extraplanos", "Cant": math.ceil(area_tot*40), "Unid": "Und", "Costo": area_tot * 40 * 150},
+            {"Insumo": "Anclajes Cimentación 3/8", "Cant": math.ceil(fondo/0.6)*2, "Unid": "Und", "Costo": math.ceil(fondo/0.6)*2 * 2500}
         ]
         
         c_mat = sum([item['Costo'] for item in lista_mat]) 
@@ -79,14 +79,21 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         ml = input_data['ml']; alt = input_data['altura']; area = ml*alt
         tipo = input_data['tipo']; es_doble = "Doble" in tipo
         
-        f_perf = 1.8 if es_doble else 1.0; f_malla = 2.1 if es_doble else 1.1
+        # Factores Técnicos
+        f_perf = 1.8 if es_doble else 1.5 # 1.5 para Sencillo (Postes cada 1.2m)
+        f_malla = 2.1 if es_doble else 1.1 # 1.1 para Sencillo (Malla central)
         f_cem = 0.4 if es_doble else 0.25 
         
-        ml_perf = area * 1.5 * f_perf
+        ml_perf = area * f_perf
         cant_tubos = math.ceil(ml_perf / 6.0)
         cant_malla = math.ceil(area * f_malla)
         cant_cemento = math.ceil(area * f_cem)
         
+        # Fijaciones (CORREGIDO)
+        cant_tornillos = math.ceil(area * 30) # 30 tornillos por m2 (Estructura + Malla)
+        cant_anclajes = math.ceil(ml / 0.60) # 1 perno cada 60cm en la base
+        
+        # Cimentación
         vol_cinta = ml * 0.20 * 0.25
         cant_cem_cim = math.ceil(vol_cinta * 7)
         cant_arena_cim = vol_cinta * 1.1
@@ -94,6 +101,8 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         lista_mat = [
             {"Insumo": "Perfil PGC 90x40 Cal.22 (Parales)", "Cant": cant_tubos, "Unid": "Tubos", "Costo": cant_tubos*6*P['perfil_pgc90_ml']},
             {"Insumo": "Malla Electrosoldada 4mm/5mm", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
+            {"Insumo": "Tornillería Extraplana (Wafer)", "Cant": cant_tornillos, "Unid": "Und", "Costo": cant_tornillos * 150},
+            {"Insumo": "Pernos Expansivos 3/8 (Anclaje)", "Cant": cant_anclajes, "Unid": "Und", "Costo": cant_anclajes * 3500},
             {"Insumo": "Cemento Gris (Muro + Cimentación)", "Cant": cant_cemento+cant_cem_cim, "Unid": "Bultos", "Costo": (cant_cemento+cant_cem_cim)*P['cemento_gris_50kg']},
             {"Insumo": "Arena Lavada (Mezcla A)", "Cant": math.ceil(cant_arena_cim), "Unid": "m3", "Costo": (cant_arena_cim)*P['arena_rio_m3']}
         ]
@@ -124,9 +133,15 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         cant_cemento = math.ceil(area_muros * 0.35 + (area*0.1*7))
         cant_tejas = math.ceil(area_techo / 1.8)
         
+        # Fijaciones Casa
+        cant_tornillos = math.ceil((area_muros + area_techo) * 35)
+        cant_kit_teja = math.ceil(area_techo * 4) # 4 tornillos techo por m2
+        
         lista_mat = [
-            {"Insumo": "Perfil PGC 90x40 Cal.22 (Estructura)", "Cant": cant_tubos_muro+cant_tubos_techo, "Unid": "Tubos", "Costo": (cant_tubos_muro+cant_tubos_techo)*6*P['perfil_pgc90_ml']},
+            {"Insumo": "Perfil PGC 90x40 Cal.22 (Total)", "Cant": cant_tubos_muro+cant_tubos_techo, "Unid": "Tubos", "Costo": (cant_tubos_muro+cant_tubos_techo)*6*P['perfil_pgc90_ml']},
             {"Insumo": f"Cubierta: {nom_teja}", "Cant": cant_tejas, "Unid": "Hojas", "Costo": cant_tejas*1.8*p_teja},
+            {"Insumo": "Kit Fijación Teja (Tornillo+Capuchón)", "Cant": cant_kit_teja, "Unid": "Und", "Costo": cant_kit_teja * 800},
+            {"Insumo": "Tornillería Estructura (Wafer)", "Cant": cant_tornillos, "Unid": "Und", "Costo": cant_tornillos * 150},
             {"Insumo": "Malla Electrosoldada 5mm", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
             {"Insumo": "Cemento Estructural (Gris)", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento*P['cemento_gris_50kg']},
             {"Insumo": "Agregados (Arena/Triturado)", "Cant": math.ceil(area*0.2), "Unid": "m3", "Costo": math.ceil(area*0.2)*P['arena_rio_m3']}

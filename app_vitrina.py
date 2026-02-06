@@ -293,25 +293,48 @@ elif st.session_state.view == 'domos':
             except: st.info("Sube 'vis_familiar.png'")
 
 # ==========================================
-# 🎨 VISTA: MUROS
+# 🎨 VISTA: MUROS (ACTUALIZADO V105)
 # ==========================================
 elif st.session_state.view == 'muros':
     st.button("⬅️ Volver", on_click=lambda: set_view('home')); st.header("🛡️ Cotizador Muros")
     c1, c2 = st.columns([1, 1.5])
     with c1:
-        ml = st.number_input("Metros Lineales:", 50.0); got = st.checkbox("Gotero", True)
-        data = calcular_proyecto({'area': ml*2.2, 'ml': ml}, tipo="muro", tiene_gotero=got, incluye_acabados=False)
-        st.metric("VALOR TOTAL", f"${data['precio']:,.0f}")
-        st.success("✅ Estructura + Cimentación Corrida + Acabado Impermeable")
-        if es_admin:
-            st.warning("🕵️ RADIOGRAFÍA")
-            st.write(f"Mat: ${data['desglose']['materiales']:,.0f} | MO: ${data['desglose']['mano_obra']:,.0f}")
-            st.success(f"Util: ${data['utilidad']:,.0f}")
-        if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cliente", "Muro", data, "Muro Perimetral Ferrotek", False), "muro.pdf")
+        ml = st.number_input("Metros Lineales:", 70.0)
+        altura = st.number_input("Altura (m):", 2.20)
+        
+        # --- NUEVA OPCIÓN ---
+        una_cara = st.checkbox("Acabado a 1 Sola Cara (Ahorro)", value=True)
+        got = st.checkbox("Incluir Gotero", True)
+        
+        # Cálculo de área real
+        area_total = ml * altura
+        
+        # Factor de ajuste por 1 cara (Ahorra 15% en materiales finos y 30% en MO de acabado)
+        factor_ahorro = 0.85 if una_cara else 1.0
+        
+        data = calcular_proyecto({'area': area_total, 'ml': ml}, tipo="muro", tiene_gotero=got, incluye_acabados=False)
+        
+        # Aplicamos el descuento manual al resultado
+        precio_ajustado = data['precio'] * factor_ahorro
+        
+        st.metric("VALOR TOTAL MATERIALES + MO", f"${precio_ajustado:,.0f}")
+        
+        st.info(f"📏 Área Total: {area_total:.2f} m²")
+        
+        if una_cara:
+            st.success("✅ Estructura Completa + Mallas Dobles")
+            st.warning("⚠️ Acabado Piel de Roca solo en cara frontal")
+        else:
+            st.success("✅ Acabado Piel de Roca en AMBAS caras")
+            
+        if st.text_input("Cliente:"): 
+            detalles = f"Muro Perimetral {ml}x{altura}m. " + ("Acabado 1 Cara." if una_cara else "Acabado 2 Caras.")
+            st.download_button("PDF Cotización", generar_pdf_cotizacion("Cliente", "Muro", data, detalles, False), "muro.pdf")
+            
     with c2:
-        try: st.image("muro_perimetral.png", caption="Muro Blindado con Gotero", use_container_width=True)
+        try: st.image("muro_perimetral.png", caption="Detalle Constructivo", use_container_width=True)
         except: st.info("Sube imagen 'muro_perimetral.png'")
-
+        
 # ==========================================
 # 🎨 VISTA: VIVIENDAS
 # ==========================================

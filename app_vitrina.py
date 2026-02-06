@@ -32,35 +32,88 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg_meta):
     return insumos
 
 # ==========================================
-# 3. MOTOR DE COSTOS
+# 3. MOTOR DE COSTOS Y MATERIALES (V118)
 # ==========================================
 def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True):
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
+    lista_mat = [] # Aquí guardaremos la lista de compras
+    
     # --- DOMOS ---
     if linea_negocio == "domo":
         ancho = input_data['ancho']; fondo = input_data['fondo']
         alt_m = 0.80; radio = ancho/2.0; alt_c = alt_m + radio 
-        perim = (math.pi * radio) + (alt_m * 2)
-        area_tot = (perim * fondo) + (math.pi * radio**2) + (2 * ancho * alt_m)
-        ml_pgc = (math.ceil(fondo/0.6)+1) * perim + ((math.pi * radio**2) * 3.5)
         
-        c_mat = (ml_pgc * P['perfil_pgc90_ml']) + (area_tot * 2.1 * P['malla_5mm_m2']) + (area_tot * 65000)
+        # Geometría
+        perim_arco = (math.pi * radio) + (alt_m * 2)
+        area_env = perim_arco * fondo
+        area_timp = (math.pi * radio**2) + (2 * ancho * alt_m)
+        area_tot = area_env + area_timp
+        
+        # Cantidades Físicas
+        num_arcos = math.ceil(fondo/0.6) + 1
+        ml_pgc_tot = (num_arcos * perim_arco) + (area_timp * 3.5)
+        cant_tubos = math.ceil(ml_pgc_tot / 6.0)
+        cant_malla = math.ceil(area_tot * 2.1) # m2 (Doble capa + traslape)
+        cant_cemento = math.ceil(area_tot * 0.35) # Bultos aprox x m2 (4cm espesor)
+        cant_arena = math.ceil(area_tot * 0.05) # m3
+        cant_tornillos = math.ceil(area_tot * 30) # Unidades
+        
+        # Generar Lista
+        lista_mat = [
+            {"Insumo": "Perfil PGC 90 (6m)", "Cant": cant_tubos, "Unid": "Tubos", "Costo": cant_tubos * 6 * P['perfil_pgc90_ml']},
+            {"Insumo": "Malla 5mm", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla * P['malla_5mm_m2']},
+            {"Insumo": "Cemento Gris (50kg)", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento * P['cemento_gris_50kg']},
+            {"Insumo": "Arena Río", "Cant": cant_arena, "Unid": "m3", "Costo": cant_arena * P['arena_rio_m3']},
+            {"Insumo": "Tornillería/Anclajes", "Cant": cant_tornillos, "Unid": "Und", "Costo": cant_tornillos * 150} # Promedio tornillo
+        ]
+        
+        c_mat = sum([item['Costo'] for item in lista_mat])
         c_mo = math.ceil(ancho*fondo/2.0) * P['dia_cuadrilla']
         c_acab = (ancho*fondo * P.get('valor_acabados_vis_m2', 350000)) if incluye_acabados else 0
+        
         total = c_mat + c_mo + c_acab
-        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, "geo": {"h": alt_c, "area": area_tot}, "desglose": {"mat":c_mat, "mo":c_mo, "acab":c_acab}}
+        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
+                "geo": {"h": alt_c, "area": area_tot}, 
+                "desglose": {"mat":c_mat, "mo":c_mo, "acab":c_acab},
+                "materiales": lista_mat}
 
     # --- MUROS ---
     elif linea_negocio == "muro":
         ml = input_data['ml']; alt = input_data['altura']; area = ml*alt
-        fac = 1.8 if "Doble" in input_data['tipo'] else 1.0
-        c_mat = ((area * 1.5 * P['perfil_pgc90_ml']) + (area * 2.1 * P['malla_5mm_m2']) + (area * 35000)) * fac
-        c_cim = (ml * 0.2 * 0.25) * 350000
-        c_mo = (area/5.0 * P['dia_cuadrilla']) * fac
-        total = c_mat + c_cim + c_mo
-        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, "desglose": {"mat":c_mat+c_cim, "mo":c_mo, "acab":0}}
+        tipo = input_data['tipo']
+        es_doble = "Doble" in tipo
+        
+        # Factores
+        f_perf = 1.8 if es_doble else 1.0; f_malla = 2.1 if es_doble else 1.1
+        f_cem = 0.4 if es_doble else 0.25 # Bultos por m2
+        
+        # Cantidades
+        ml_perf = area * 1.5 * f_perf
+        cant_tubos = math.ceil(ml_perf / 6.0)
+        cant_malla = math.ceil(area * f_malla)
+        cant_cemento = math.ceil(area * f_cem)
+        cant_arena = math.ceil(area * 0.04 * (2 if es_doble else 1))
+        
+        # Cimentación
+        vol_cinta = ml * 0.20 * 0.25
+        cant_cem_cim = math.ceil(vol_cinta * 7) # 7 bultos por m3 concreto
+        cant_arena_cim = vol_cinta * 1.1
+        
+        lista_mat = [
+            {"Insumo": "Perfil PGC (Estructura)", "Cant": cant_tubos, "Unid": "Tubos", "Costo": cant_tubos*6*P['perfil_pgc90_ml']},
+            {"Insumo": "Malla Refuerzo", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
+            {"Insumo": "Cemento (Muro+Cim)", "Cant": cant_cemento+cant_cem_cim, "Unid": "Bultos", "Costo": (cant_cemento+cant_cem_cim)*P['cemento_gris_50kg']},
+            {"Insumo": "Arena Lavada", "Cant": cant_arena+cant_arena_cim, "Unid": "m3", "Costo": (cant_arena+cant_arena_cim)*P['arena_rio_m3']}
+        ]
+        
+        c_mat = sum([item['Costo'] for item in lista_mat])
+        c_mo = (area/5.0 * P['dia_cuadrilla']) * (1.5 if es_doble else 1.0)
+        
+        total = c_mat + c_mo
+        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
+                "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat}
 
     # --- CASAS ---
     elif linea_negocio == "casa":
@@ -68,27 +121,53 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         estilo = input_data.get('estilo', 'Tradicional')
         
         if estilo == 'Tradicional':
-            fac_muros = 2.8; fac_techo = 1.4; costo_teja = 60000
+            fac_muros = 2.8; fac_techo = 1.4; nom_teja = "Teja PVC Colonial"; p_teja = 60000
         else: # Serie M
-            fac_muros = 2.6; fac_techo = 1.2; costo_teja = 45000
+            fac_muros = 2.6; fac_techo = 1.2; nom_teja = "Teja PVC Termo"; p_teja = 45000
 
-        c_mur = area * fac_muros * 65000
-        c_cub = area * fac_techo * (P['perfil_pgc90_ml'] + costo_teja)
-        c_losa = area * 0.10 * 450000
+        # Cantidades Aproximadas (Estimación por m2 de piso)
+        area_muros = area * fac_muros
+        area_techo = area * fac_techo
+        
+        cant_tubos_muro = math.ceil((area_muros * 1.5) / 6.0) # Perfilería vertical/horizontal
+        cant_tubos_techo = math.ceil((area_techo * 1.2) / 6.0) # Correas/Cerchas
+        cant_malla = math.ceil(area_muros * 2.2)
+        cant_cemento = math.ceil(area_muros * 0.35 + (area*0.1*7)) # Muros + Losa piso
+        cant_tejas = math.ceil(area_techo / 1.8) # Asumiendo teja de 1.8m2 utiles
+        
+        lista_mat = [
+            {"Insumo": "Perfil PGC (Muros+Cub)", "Cant": cant_tubos_muro+cant_tubos_techo, "Unid": "Tubos", "Costo": (cant_tubos_muro+cant_tubos_techo)*6*P['perfil_pgc90_ml']},
+            {"Insumo": f"Cubierta {nom_teja}", "Cant": cant_tejas, "Unid": "Piezas", "Costo": cant_tejas*1.8*p_teja},
+            {"Insumo": "Malla Electrosoldada", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
+            {"Insumo": "Cemento (Gris)", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento*P['cemento_gris_50kg']},
+            {"Insumo": "Arena/Triturado", "Cant": math.ceil(area*0.2), "Unid": "m3", "Costo": math.ceil(area*0.2)*P['arena_rio_m3']}
+        ]
+        
+        c_mat = sum([item['Costo'] for item in lista_mat])
         c_mo = area * P['dia_cuadrilla'] * 1.1
         c_acab = (area * P['valor_acabados_m2']) if incluye_acabados else 0
         
-        total = c_mur + c_cub + c_losa + c_mo + c_acab
+        total = c_mat + c_mo + c_acab
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
-                "desglose": {"mat": c_mur+c_cub+c_losa, "mo": c_mo, "acab": c_acab}}
+                "desglose": {"mat": c_mat, "mo": c_mo, "acab": c_acab},
+                "materiales": lista_mat}
 
     # --- AGUA ---
     elif linea_negocio == "agua":
         vol = input_data['vol']; h = 1.5; r = math.sqrt(vol/(math.pi*h)); area_m = 2*math.pi*r*h
-        c_mat = (area_m * 4 * P['malla_5mm_m2']) + (area_m * 0.06 * 450000) + 200000
+        
+        cant_malla = math.ceil(area_m * 4) # 4 capas
+        cant_cemento = math.ceil(area_m * 0.6) # Alta densidad
+        
+        lista_mat = [
+            {"Insumo": "Malla Hexagonal/Electro", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
+            {"Insumo": "Cemento Impermeable", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento*P['cemento_gris_50kg']},
+            {"Insumo": "Aditivos/Sika", "Cant": 1, "Unid": "Global", "Costo": 200000}
+        ]
+        c_mat = sum([item['Costo'] for item in lista_mat])
         c_mo = area_m/2.0 * P['dia_cuadrilla']
         total = c_mat + c_mo
-        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}}
+        return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat}
 
     return {"precio": 0}
 
@@ -143,16 +222,22 @@ def set_view(name): st.session_state.view = name
 # ==========================================
 # 6. VISTAS
 # ==========================================
-# Función auxiliar para mostrar desglose (Solo Admin)
 def mostrar_desglose(data):
     if es_admin:
         st.markdown("---")
-        st.markdown("##### 🕵️ Auditoría de Costos (Interno)")
+        st.markdown("##### 🕵️ Auditoría Financiera")
         c1, c2, c3 = st.columns(3)
         c1.metric("🧱 Materiales", f"${data['desglose']['mat']:,.0f}")
         c2.metric("👷 Mano de Obra", f"${data['desglose']['mo']:,.0f}")
-        c3.metric("✨ Acabados", f"${data['desglose']['acab']:,.0f}")
-        st.success(f"📈 UTILIDAD NETA: ${data['utilidad']:,.0f}")
+        c3.success(f"📈 UTILIDAD: ${data['utilidad']:,.0f}")
+        
+        with st.expander("📦 LISTA DE MATERIALES (LOGÍSTICA)"):
+            if 'materiales' in data:
+                df_mat = pd.DataFrame(data['materiales'])
+                st.dataframe(df_mat, hide_index=True, use_container_width=True)
+                st.caption("Nota: Cantidades calculadas con factor de desperdicio estándar.")
+            else:
+                st.info("Lista no disponible para este ítem.")
 
 # --- HOME ---
 if st.session_state.view == 'home':
@@ -180,7 +265,7 @@ elif st.session_state.view == 'casas':
             full_t = st.checkbox("Llave en Mano", True, key="chk_t")
             data_t = calcular_proyecto({'area': area_t, 'estilo': 'Tradicional'}, "casa", full_t)
             st.metric("Inversión", f"${data_t['precio']:,.0f}")
-            mostrar_desglose(data_t) # <--- AQUÍ ESTÁ EL DESGLOSE
+            mostrar_desglose(data_t)
             if st.text_input("Cliente Tradicional:", key="cli_t"):
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, mod_t), "cot_trad.pdf")
         with c2: st.info("Techo PVC Colonial, Aleros.")
@@ -193,7 +278,7 @@ elif st.session_state.view == 'casas':
             full_m = st.checkbox("Llave en Mano", True, key="chk_m")
             data_m = calcular_proyecto({'area': area_m, 'estilo': 'Serie M'}, "casa", full_m)
             st.metric("Inversión", f"${data_m['precio']:,.0f}")
-            mostrar_desglose(data_m) # <--- AQUÍ ESTÁ EL DESGLOSE
+            mostrar_desglose(data_m)
             if st.text_input("Cliente Serie M:", key="cli_m"):
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, mod_m), "cot_mod.pdf")
         with c2: st.success("Diseño Cúbico, Wet-Wall.")
@@ -207,7 +292,7 @@ elif st.session_state.view == 'muros':
         ml = st.number_input("Largo (m):", 10.0); alt = st.number_input("Alto (m):", 2.2)
         data = calcular_proyecto({'ml':ml, 'altura':alt, 'tipo':tipo}, "muro")
         st.metric("Inversión", f"${data['precio']:,.0f}")
-        mostrar_desglose(data) # <--- DESGLOSE
+        mostrar_desglose(data)
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Muro", data, f"{tipo}"), "cot.pdf")
     with c2: st.info("Cerramientos de alta resistencia.")
 
@@ -222,7 +307,7 @@ elif st.session_state.view == 'domos':
         full = st.checkbox("Acabados", True if "Vivienda" in uso else False)
         data = calcular_proyecto({'ancho':ancho, 'fondo':fondo}, "domo", full)
         st.metric("Inversión", f"${data['precio']:,.0f}")
-        mostrar_desglose(data) # <--- DESGLOSE
+        mostrar_desglose(data)
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Domo", data, f"{ancho}x{fondo}m"), "cot.pdf")
     with c2: st.success(f"Altura: {data['geo']['h']:.2f}m")
 
@@ -234,7 +319,7 @@ elif st.session_state.view == 'agua':
         vol = st.slider("Litros:", 1000, 20000, 5000, 1000)
         data = calcular_proyecto({'vol': vol/1000}, "agua")
         st.metric("Precio", f"${data['precio']:,.0f}")
-        mostrar_desglose(data) # <--- DESGLOSE
+        mostrar_desglose(data)
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Tanque", data, f"{vol}L"), "cot.pdf")
 
 # --- FÁBRICA ---

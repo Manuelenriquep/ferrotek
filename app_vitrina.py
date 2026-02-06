@@ -59,36 +59,28 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg_meta):
     return insumos
 
 # ==========================================
-# 🧠 MOTOR DE COSTOS (GEOMETRÍA PERALTADA ESTÁNDAR)
+# 🧠 MOTOR DE COSTOS (CORREGIDO V110)
 # ==========================================
 def calcular_proyecto(input_data, tipo="general", tiene_gotero=False, incluye_acabados=True):
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
-    # --- CASO DOMOS (TODOS CON MURETE 0.80m) ---
+    # --- CASO DOMOS V7 ---
     if tipo == "domo_boveda":
         ancho = input_data['ancho']; fondo = input_data['fondo']
-        
-        # --- CÁLCULO GEOMÉTRICO (UNIVERSAL) ---
-        altura_murete = 0.80  # Estándar Ferrotek para habitabilidad
+        altura_murete = 0.80 
         radio = ancho / 2.0 
-        altura_cumbrera = altura_murete + radio # Altura total (Piso a Techo centro)
+        altura_cumbrera = altura_murete + radio 
         
-        # Perímetro de la sección transversal (La "U" invertida)
         long_arco_curvo = math.pi * radio 
         long_muretes_vert = altura_murete * 2 
         perimetro_total_seccion = long_arco_curvo + long_muretes_vert
         
-        # Áreas Reales
         area_envolvente = perimetro_total_seccion * fondo
-        # Tímpanos (Tapas): 2 semicírculos (1 círculo) + 2 rectángulos de murete
         area_timpanos = (math.pi * (radio**2)) + (2 * ancho * altura_murete)
-        
         area_total_m2 = area_envolvente + area_timpanos
         
-        # Estructura
         num_arcos = math.ceil(fondo/0.6) + 1
-        # Material estructura: Arcos completos (Curva + Patas rectas) + Estructura tímpanos
         ml_total_estructura = (num_arcos * perimetro_total_seccion) + (area_timpanos * 3.5)
         
         costo_mat = (
@@ -100,7 +92,6 @@ def calcular_proyecto(input_data, tipo="general", tiene_gotero=False, incluye_ac
             ((perimetro_total_seccion * fondo) * P.get('aislante_m2', 12000)) +
             (area_total_m2 * 4000)
         )
-        
         costo_mo = math.ceil((ancho*fondo)/2.0) * P['dia_cuadrilla'] 
         costo_acabados = (ancho*fondo) * P.get('valor_acabados_vis_m2', 350000) if incluye_acabados else 0
         
@@ -113,7 +104,7 @@ def calcular_proyecto(input_data, tipo="general", tiene_gotero=False, incluye_ac
             "datos_geo": {"altura_total": altura_cumbrera, "altura_murete": altura_murete}
         }
 
-    # --- CASO GENERAL ---
+    # --- CASO GENERAL (MUROS/VIVIENDAS) ---
     else:
         area_m2 = input_data['area']; ml_muro_val = input_data.get('ml', 0)
         espesor = 0.06 if tipo=="estanque" else 0.055 if tipo=="vivienda" else 0.04
@@ -139,11 +130,13 @@ def calcular_proyecto(input_data, tipo="general", tiene_gotero=False, incluye_ac
         if tipo == "vivienda": costo_acabados = (area_m2/3.5 * P.get('valor_acabados_m2', 450000)) if incluye_acabados else 0
         else: costo_acabados = 0 
         
-        total = (costo_mat + mo + extra + acabados) * factor_ahorro
+        # --- CORRECCIÓN AQUÍ: Se usó 'costo_acabados' en vez de 'acabados' ---
+        total = (costo_mat + mo + extra + costo_acabados) * factor_ahorro
+        
         return {
             "precio": total/(1-margen), 
             "utilidad": (total/(1-margen))-total, 
-            "desglose": {"materiales": costo_mat, "mano_obra": mo, "acabados": acabados}
+            "desglose": {"materiales": costo_mat, "mano_obra": mo, "acabados": costo_acabados}
         }
 
 # ==========================================
@@ -220,9 +213,9 @@ def generar_dossier_tecnico():
     pdf.set_font('Arial', 'B', 10); pdf.set_fill_color(230, 230, 230)
     pdf.cell(col_var, 8, "VARIABLE", 1, 0, 'C', 1); pdf.cell(col_trad, 8, "TRADICIONAL", 1, 0, 'C', 1); pdf.cell(col_ferro, 8, "FERROTEK", 1, 1, 'C', 1)
     pdf.set_font('Arial', '', 9); y_b = pdf.get_y()
-    pdf.cell(col_var, 12, "VELOCIDAD", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "LENTA", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "RAPIDA", 1, 'C')
-    y_b = pdf.get_y(); pdf.cell(col_var, 12, "PESO", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "PESADO", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "LIVIANO", 1, 'C')
-    y_b = pdf.get_y(); pdf.cell(col_var, 12, "ACABADO", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "COSTOSO", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "PIEL DE ROCA", 1, 'C')
+    pdf.cell(col_var, 12, "VELOCIDAD", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "LENTA\n(Fraguados, mucha MO)", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "RAPIDA\n(Montaje seco + Proyeccion)", 1, 'C')
+    y_b = pdf.get_y(); pdf.cell(col_var, 12, "PESO", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "PESADO\n(Cimentacion profunda)", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "LIVIANO\n(Ideal laderas)", 1, 'C')
+    y_b = pdf.get_y(); pdf.cell(col_var, 12, "ACABADO", 1, 0, 'C'); pdf.set_xy(10+col_var, y_b); pdf.multi_cell(col_trad, 6, "COSTOSO\n(Requiere panete y pintura)", 1, 'C'); pdf.set_xy(10+col_var+col_trad, y_b); pdf.multi_cell(col_ferro, 6, "PIEL DE ROCA\n(Directo e impermeable)", 1, 'C')
     pdf.ln(10); pdf.add_page(); pdf.set_font('Arial', 'B', 12); pdf.cell(0, 10, '3. APLICACIONES Y VERSATILIDAD', 0, 1)
     pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "A. VIVIENDA (VIS): Elimina costos de cubierta.\nB. TANQUES: Impermeabilidad superior.\nC. TURISMO: Arquitectura organica sin encofrados.")
     pdf.ln(5); pdf.set_fill_color(240, 240, 240); pdf.rect(10, pdf.get_y(), 190, 45, 'F'); pdf.set_xy(15, pdf.get_y()+5)
@@ -244,7 +237,7 @@ def generar_manual_mantenimiento():
     return bytes(pdf.output(dest='S'))
 
 # ==========================================
-# 🎛️ SIDEBAR (LOGIN)
+# 🎛️ SIDEBAR
 # ==========================================
 with st.sidebar:
     st.title("🎛️ Admin Ferrotek")
@@ -335,7 +328,6 @@ elif st.session_state.view == 'domos':
         titulo_precio = "INVERSIÓN TOTAL" if incluir_acabados else "COSTO OBRA GRIS"
         st.metric(titulo_precio, f"${data['precio']:,.0f}")
         
-        # Muestra la altura resultante para que el usuario verifique si le sirve
         alt_murete = data['datos_geo']['altura_murete']
         alt_total = data['datos_geo']['altura_total']
         st.success(f"📏 Altura Central: {alt_total:.2f}m | Altura Bordes: {alt_murete:.2f}m")
@@ -352,7 +344,6 @@ elif st.session_state.view == 'domos':
             st.download_button("Descargar Cotización", generar_pdf_cotizacion("Cliente", "Domo V7", data, desc, incluir_acabados), "cotizacion_domo.pdf")
             
     with c2:
-        # Foto dinámica
         if "Garage" in uso_domo:
             try: st.image("muro_perimetral.png", caption="Estructura Bodega/Garage", use_container_width=True)
             except: st.info("Sube foto Bodega")
@@ -389,7 +380,8 @@ elif st.session_state.view == 'muros':
         
         if es_admin:
             st.warning("🕵️ RADIOGRAFÍA (Sin Ajuste 1 Cara)")
-            st.write(f"Base: ${data['costo_total']:,.0f}")
+            c1b, c2b = st.columns(2)
+            c1b.write(f"Mat: ${data['desglose']['materiales']:,.0f}"); c1b.write(f"MO: ${data['desglose']['mano_obra']:,.0f}")
             st.success(f"Util: ${data['utilidad']:,.0f}")
             
         if st.text_input("Cliente:"): 
@@ -416,8 +408,9 @@ elif st.session_state.view == 'viviendas':
         else: st.info("✅ Estructura Unibody (Sin Pisos/Enchapes)")
         if es_admin:
             st.warning("🕵️ RADIOGRAFÍA")
-            st.write(f"Mat: ${data['desglose']['materiales']:,.0f} | MO: ${data['desglose']['mano_obra']:,.0f}")
-            st.success(f"Util: ${data['utilidad']:,.0f}")
+            c1b, c2b = st.columns(2)
+            c1b.write(f"Mat: ${data['desglose']['materiales']:,.0f}"); c1b.write(f"MO: ${data['desglose']['mano_obra']:,.0f}")
+            c2b.write(f"Acab: ${data['desglose']['acabados']:,.0f}"); c2b.success(f"Util: ${data['utilidad']:,.0f}")
         if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cliente", mod, data, "Vivienda Unibody Recta", incluir_acabados), "casa.pdf")
     with c2:
         img_file = "vivienda_suite.png"

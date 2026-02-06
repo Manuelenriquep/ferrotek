@@ -56,9 +56,7 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
-    # ---------------------------------------------------------
-    # LÍNEA 3: DOMOS EVOLUTIVOS (Con Murete 0.80m)
-    # ---------------------------------------------------------
+    # --- DOMOS EVOLUTIVOS ---
     if linea_negocio == "domo":
         ancho = input_data['ancho']; fondo = input_data['fondo']
         altura_murete = 0.80  
@@ -83,62 +81,47 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         )
         costo_mo = math.ceil((ancho*fondo)/2.0) * P['dia_cuadrilla'] 
         costo_acab = (ancho*fondo) * P.get('valor_acabados_vis_m2', 350000) if incluye_acabados else 0
-        
         total = costo_mat + costo_mo + costo_acab
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
                 "desglose": {"mat": costo_mat, "mo": costo_mo, "acab": costo_acab},
                 "geo": {"h_total": altura_cumbrera, "area": area_total_m2}}
 
-    # ---------------------------------------------------------
-    # LÍNEA 1: MUROS FERROTEK
-    # ---------------------------------------------------------
+    # --- MUROS FERROTEK ---
     elif linea_negocio == "muro":
         ml = input_data['ml']; altura = input_data['altura']
         tipo_muro = input_data['tipo_muro']
         area = ml * altura
         factor_mat = 1.8 if "Doble" in tipo_muro else 1.0
         factor_mo = 1.5 if "Doble" in tipo_muro else 1.0
-            
         costo_mat_base = (
             (area * 1.5 * P['perfil_pgc90_ml']) + 
             (area * 2.1 * P['malla_5mm_m2']) +    
             (area * 0.04 * 2200 / 50 * P['cemento_gris_50kg']) +
             (area * 0.04 * 1.1 * P['arena_rio_m3']) 
         ) * factor_mat
-        
         vol_cinta = ml * 0.20 * 0.25
         costo_cimentacion = (vol_cinta * 350000)
         costo_mo = (area / 5.0 * P['dia_cuadrilla']) * factor_mo
-        
         total = costo_mat_base + costo_cimentacion + costo_mo
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total,
                 "desglose": {"mat": costo_mat_base + costo_cimentacion, "mo": costo_mo, "acab": 0}}
 
-    # ---------------------------------------------------------
-    # LÍNEA 2: CASA SERIE M (M-2 / M-3)
-    # ---------------------------------------------------------
+    # --- CASA SERIE M ---
     elif linea_negocio == "casa":
         area_piso = input_data['area']
-        area_muros = area_piso * 2.6 # Optimizado Serie M (Menos pasillos = Menos muros)
-        area_techo = area_piso * 1.2 # Techo oculto o simple
-        
+        area_muros = area_piso * 2.6 
+        area_techo = area_piso * 1.2 
         costo_muros = area_muros * 65000 
-        costo_cubierta = area_techo * (P['perfil_pgc90_ml'] * 1.2 + 45000) # PVC + Estructura simple
+        costo_cubierta = area_techo * (P['perfil_pgc90_ml'] * 1.2 + 45000) 
         costo_losa = area_piso * 0.10 * 450000 
-        
         costo_mat = costo_muros + costo_cubierta + costo_losa
-        
-        # Rendimiento mejorado por Modulación M-2/M-3
         costo_mo = (area_piso / 1.0 * P['dia_cuadrilla']) 
         costo_acab = (area_piso * P['valor_acabados_m2']) if incluye_acabados else 0
-        
         total = costo_mat + costo_mo + costo_acab
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total,
                 "desglose": {"mat": costo_mat, "mo": costo_mo, "acab": costo_acab}}
 
-    # ---------------------------------------------------------
-    # LÍNEA 4: ESTANQUES
-    # ---------------------------------------------------------
+    # --- ESTANQUES ---
     elif linea_negocio == "agua":
         volumen_m3 = input_data['volumen']
         altura_tanque = 1.5
@@ -158,7 +141,7 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
     return {"precio": 0, "utilidad": 0, "desglose": {"mat":0, "mo":0, "acab":0}}
 
 # ==========================================
-# 📄 PDF GENERATOR (ACTUALIZADO SERIE M)
+# 📄 PDF GENERATOR
 # ==========================================
 class PDFBase(FPDF):
     def header(self):
@@ -188,59 +171,36 @@ class PDFDossier(FPDF):
 
 def generar_dossier_comercial():
     pdf = PDFDossier(); pdf.add_page()
-    # PORTADA
-    pdf.set_font('Arial', 'B', 24); pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 15, 'CATALOGO SERIE M (MODULAR)', 0, 1, 'C')
+    pdf.set_font('Arial', 'B', 24); pdf.set_text_color(0, 51, 102); pdf.cell(0, 15, 'CATALOGO SERIE M (MODULAR)', 0, 1, 'C')
     pdf.set_font('Arial', 'I', 14); pdf.set_text_color(100); pdf.cell(0, 10, 'Eficiencia Pura - Cero Desperdicio', 0, 1, 'C'); pdf.ln(5)
-    
-    # INTRODUCCIÓN
     pdf.set_font('Arial', '', 11); pdf.set_text_color(0)
-    pdf.multi_cell(0, 6, "Diseñados bajo la modulación estricta del Steel Framing (40/60 cm) para eliminar cortes y maximizar el beneficio. La solución definitiva al déficit habitacional.")
+    pdf.multi_cell(0, 6, "Diseñados bajo la modulación estricta del Steel Framing (40/60 cm) para eliminar cortes y maximizar el beneficio.")
     pdf.ln(5)
-
-    # MODELO M-2
     pdf.set_fill_color(240, 240, 240); pdf.rect(10, pdf.get_y(), 190, 8, 'F'); pdf.set_xy(10, pdf.get_y())
-    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 8, '1. MODELO M-2: "MINIMALISTA ESENCIAL" (45 m2)', 0, 1, 'L')
-    pdf.ln(2)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 6, "- PERFIL: Parejas jóvenes, adultos mayores, casas de campo.\n- DISTRIBUCION: 2 Habitaciones, 1 Baño, Sala-Comedor-Cocina (Open Plan).\n- VENTAJAS: Acústica superior y Acabado Piel de Roca continuo.\n- VELOCIDAD: Tiempo récord de ejecución (aprox 20 días obra gris).")
+    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 8, '1. MODELO M-2: "MINIMALISTA ESENCIAL" (45 m2)', 0, 1, 'L'); pdf.ln(2)
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, "- PERFIL: Parejas jóvenes, adultos mayores.\n- DISTRIBUCION: 2 Hab, 1 Baño, Sala-Comedor (Open Plan).\n- VENTAJAS: Acústica superior y Acabado Piel de Roca.\n- VELOCIDAD: Tiempo récord de ejecución.")
     pdf.ln(5)
-
-    # MODELO M-3
     pdf.set_fill_color(240, 240, 240); pdf.rect(10, pdf.get_y(), 190, 8, 'F'); pdf.set_xy(10, pdf.get_y())
-    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 8, '2. MODELO M-3: "FAMILIAR PRO" (60-70 m2)', 0, 1, 'L')
-    pdf.ln(2)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 6, "- PERFIL: Familias consolidadas.\n- DISTRIBUCION: 3 Habitaciones, 1 o 2 Baños, Cocina Americana con Barra.\n- VENTAJAS: Climatización pasiva (Zeolita) y resistencia al impacto (Antibalas/Antigolpes).\n- ZONA HUMEDA: Wet Wall optimizado para reducir costos de plomería.")
-    pdf.ln(8)
-
-    # RENTABILIDAD
-    pdf.set_font('Arial', 'B', 12); pdf.set_text_color(0, 100, 0)
-    pdf.cell(0, 8, 'POR QUE ELEGIR LA SERIE M?', 0, 1)
-    pdf.set_font('Arial', '', 10); pdf.set_text_color(0)
-    pdf.multi_cell(0, 5, "1. ECONOMIA DE ESCALA: Paneles repetitivos y moldes idénticos.\n2. CERO MERMA: Desperdicio inferior al 5% vs 15% tradicional.\n3. MANTENIMIENTO CERO: Impermeable, lavable y sin pintura.\n4. INSTALACIONES INTELIGENTES: Tuberías pre-instaladas sin romper muros.")
-    
+    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 8, '2. MODELO M-3: "FAMILIAR PRO" (60-70 m2)', 0, 1, 'L'); pdf.ln(2)
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, "- PERFIL: Familias consolidadas.\n- DISTRIBUCION: 3 Hab, 1-2 Baños, Cocina Barra.\n- VENTAJAS: Climatización pasiva y resistencia impacto.\n- ZONA HUMEDA: Wet Wall optimizado.")
     return bytes(pdf.output(dest='S'))
 
 def generar_dossier_tecnico():
-    pdf = PDFDossier(); pdf.add_page()
-    pdf.set_font('Arial', 'B', 20); pdf.set_text_color(0, 51, 102); pdf.cell(0, 10, 'MANUAL TECNICO - SERIE M', 0, 1, 'C')
-    # ... (Se mantiene igual que versiones anteriores simplificadas para el ejemplo) ...
-    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Resumen Técnico: Estructura PGC 90, Modulación 40/60cm, Anclajes Viga Cinta.")
+    pdf = PDFDossier(); pdf.add_page(); pdf.set_font('Arial', 'B', 20); pdf.cell(0, 10, 'MANUAL TECNICO - SERIE M', 0, 1, 'C')
+    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Resumen Técnico: Estructura PGC 90, Modulación 40/60cm.")
     return bytes(pdf.output(dest='S'))
 
 def generar_manual_mantenimiento():
-    pdf = PDFDossier(); pdf.add_page()
-    pdf.set_font('Arial', 'B', 20); pdf.cell(0, 10, 'MANTENIMIENTO SERIE M', 0, 1, 'C')
-    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Limpieza con jabón neutro. No usar ácidos.")
+    pdf = PDFDossier(); pdf.add_page(); pdf.set_font('Arial', 'B', 20); pdf.cell(0, 10, 'MANTENIMIENTO SERIE M', 0, 1, 'C')
+    pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 5, "Limpieza con jabón neutro.")
     return bytes(pdf.output(dest='S'))
 
 # ==========================================
-# 🎛️ INTERFAZ DE USUARIO (PORTAFOLIO SERIE M)
+# 🎛️ SIDEBAR (LOGIN SEGURO V112.1)
 # ==========================================
 with st.sidebar:
-    st.title("🎛️ Ferrotek Manager")
-    pwd = st.text_input("Acceso Gerencial:", type="password")
+    st.markdown("### Acceso Corporativo")
+    pwd = st.text_input("Clave de Acceso:", type="password", help="Solo personal autorizado")
     
     defaults = {
         'cemento_gris_50kg': 29500, 'cal_hidratada_25kg': 25000, 'arena_rio_m3': 98000, 
@@ -256,6 +216,8 @@ with st.sidebar:
         st.session_state['margen'] = st.slider("Margen Utilidad %", 10, 60, 30)
         with st.expander("Costos Base Insumos"):
             st.session_state['precios_reales'] = st.data_editor(st.session_state['precios_reales'], key="p_edit")
+    else:
+        st.caption("Ferrotek S.A.S © 2026 | Sistema de Gestión V8.0")
 
 if 'view' not in st.session_state: st.session_state.view = 'home'
 def set_view(name): st.session_state.view = name
@@ -265,7 +227,6 @@ if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Soluciones Industrializadas")
     st.markdown("### Portafolio 'Serie M' (Manual V8.0)")
     st.markdown("---")
-    
     c1, c2, c3, c4 = st.columns(4)
     with c1: 
         st.image("https://img.icons8.com/color/96/wall.png", width=64)
@@ -287,39 +248,27 @@ if st.session_state.view == 'home':
     st.markdown("---")
     st.markdown("### 📂 Documentación Comercial")
     col_d1, col_d2 = st.columns(2)
-    with col_d1: st.download_button("📄 Descargar Dossier Serie M (NUEVO)", generar_dossier_comercial(), "Ferrotek_SerieM_Comercial.pdf", "application/pdf")
+    with col_d1: st.download_button("📄 Descargar Dossier Serie M", generar_dossier_comercial(), "Ferrotek_SerieM.pdf", "application/pdf")
     if es_admin:
-        with col_d2: st.download_button("🔒 Manual Técnico V8 (Privado)", b"DUMMY", "Manual_Tecnico_V8.pdf") # Reemplazar con archivo real
+        with col_d2: st.download_button("🔒 Manual Técnico V8 (Privado)", b"DUMMY", "Manual_Tecnico_V8.pdf")
 
 # --- VISTA CASAS (SERIE M) ---
 elif st.session_state.view == 'casas':
     st.button("⬅️ Inicio", on_click=lambda: set_view('home')); st.header("🏠 Línea Casa - Serie M (Modular)")
     c1, c2 = st.columns(2)
     with c1:
-        # SELECTOR ACTUALIZADO CON TUS NOMBRES COMERCIALES
-        mod_sel = st.selectbox("Seleccione Modelo:", 
-            ["Modelo M-2: Minimalista (45m2 - 2 Alcobas)", 
-             "Modelo M-3: Familiar Pro (70m2 - 3 Alcobas)"])
-        
+        mod_sel = st.selectbox("Seleccione Modelo:", ["Modelo M-2: Minimalista (45m2 - 2 Alcobas)", "Modelo M-3: Familiar Pro (70m2 - 3 Alcobas)"])
         area = 45 if "M-2" in mod_sel else 70
         full = st.checkbox("Incluir Acabados (Llave en Mano)", True)
-        
         data = calcular_proyecto({'area':area}, linea_negocio="casa", incluye_acabados=full)
-        
         titulo = "INVERSIÓN TOTAL" if full else "VALOR OBRA GRIS"
         st.metric(titulo, f"${data['precio']:,.0f}")
-        
-        if "M-2" in mod_sel:
-            st.info("💡 M-2: Ideal Parejas. Eficiencia Pura. Sin pasillos.")
-        else:
-            st.success("💡 M-3: Familiar. Wet-Wall optimizado. Barra Americana.")
-            
+        if "M-2" in mod_sel: st.info("💡 M-2: Ideal Parejas. Eficiencia Pura. Sin pasillos.")
+        else: st.success("💡 M-3: Familiar. Wet-Wall optimizado. Barra Americana.")
         if es_admin: st.write(f"Costo: ${data['desglose']['mat'] + data['desglose']['mo']:,.0f} | Util: ${data['utilidad']:,.0f}")
-        
         if st.text_input("Cliente:"):
             desc = f"Cotización {mod_sel}. Sistema Ferrotek Serie M."
             st.download_button("PDF Cotización", generar_pdf(st.session_state.get('cliente_name','Cliente'), "Casa Serie M", data, desc), "cotizacion_casa.pdf")
-
     with c2:
         img = "vivienda_suite.png" if "M-2" in mod_sel else "vivienda_familiar.png"
         try: st.image(img, caption=f"Render {mod_sel}", use_container_width=True)

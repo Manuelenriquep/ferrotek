@@ -181,7 +181,7 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
     return {"precio": 0}
 
 # ==========================================
-# 4. GENERADOR PDF (CON GUÍA)
+# 4. GENERADOR PDF (FIRMADO V124)
 # ==========================================
 class PDFDossier(FPDF):
     def header(self):
@@ -193,46 +193,51 @@ class PDFDossier(FPDF):
         self.set_font('Arial', 'B', 20); self.set_text_color(0, 51, 102)
         self.cell(0, 15, "FILOSOFIA DE DISEÑO FERROTEK", 0, 1, 'C')
         self.line(10, 25, 200, 25); self.ln(10)
-        
-        self.set_text_color(0)
-        self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "1. EL METRO CUADRADO UTIL", 0, 1)
-        self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "En la construccion tradicional, los muros le roban hasta un 15% del area. Con el sistema Ferrotek (espesor 10-12 cm), usted gana casi 4 m2 adicionales en una casa de 60 m2.")
+        self.set_text_color(0); self.set_font('Arial', 'B', 12); self.cell(0, 10, "1. EL METRO CUADRADO UTIL", 0, 1)
+        self.set_font('Arial', '', 11); self.multi_cell(0, 6, "Gane hasta 4 m2 adicionales de espacio útil gracias a nuestros muros de alta resistencia y bajo espesor.")
         self.ln(5)
-        
-        self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "2. FLEXIBILIDAD Y PLANTA LIBRE", 0, 1)
-        self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "Nuestras Bovedas Evolutivas no tienen columnas internas. Sugerimos usar 'Puertas Granero' (Corredizas) para separar la cocina solo cuando sea necesario.")
+        self.set_font('Arial', 'B', 12); self.cell(0, 10, "2. FLEXIBILIDAD", 0, 1)
+        self.set_font('Arial', '', 11); self.multi_cell(0, 6, "Bóvedas sin columnas internas. Use puertas corredizas para espacios dinámicos.")
         self.ln(5)
-        
-        self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "3. ORIENTACION SOLAR INTELIGENTE", 0, 1)
-        self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "Oriente los ventanales hacia la trayectoria solar predominante (Norte/Sur). Use la cara 'ciega' de la curva para protegerse del sol poniente.")
-        self.ln(5)
-        
-        self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "4. CONEXION Y CIRCULACION", 0, 1)
-        self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "NO apoye la casa en ambas medianeras. Deje un paso lateral de 90cm. Agrupe las puertas de las habitaciones.")
-        self.ln(5)
-
-        self.set_font('Arial', 'I', 10); self.set_text_color(100)
-        self.cell(0, 10, "Ferrotek: Asesoria Arquitectonica Incluida.", 0, 1, 'C')
+        self.set_font('Arial', 'I', 10); self.set_text_color(100); self.cell(0, 10, "Ferrotek: Asesoria Arquitectonica Incluida.", 0, 1, 'C')
 
 def generar_pdf_cotizacion(cliente, proyecto, datos, desc):
     pdf = PDFDossier(); pdf.add_page(); pdf.set_font('Arial', '', 12)
-    pdf.cell(0, 10, f"Cliente: {cliente} | Fecha: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
-    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 10, f"COTIZACION: {proyecto}", 0, 1)
-    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, desc); pdf.ln(10)
-    pdf.set_font('Arial', 'B', 16); pdf.cell(0, 15, f"INVERSION TOTAL: ${datos['precio']:,.0f}", 0, 1)
+    
+    # DATOS DEL CLIENTE (DESTACADO)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 10, f"PARA: {cliente.upper()}", 0, 1, 'L', 1)
+    pdf.cell(0, 10, f"FECHA: {datetime.now().strftime('%d/%m/%Y')}", 0, 1, 'L')
+    pdf.ln(5)
+    
+    # TITULO Y DESCRIPCION
+    pdf.set_font('Arial', 'B', 14); pdf.cell(0, 10, f"REF: {proyecto.upper()}", 0, 1)
+    pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, desc); pdf.ln(8)
+    
+    # PRECIO (RESALTADO)
+    pdf.set_fill_color(220, 230, 240)
+    pdf.set_font('Arial', 'B', 16); pdf.cell(0, 15, f"INVERSION TOTAL: ${datos['precio']:,.0f}", 0, 1, 'C', 1)
+    
+    # NOTA TECNICA
+    pdf.ln(5)
     if 'nota' in datos:
         pdf.set_font('Arial', 'B', 9); pdf.set_text_color(100, 0, 0)
-        pdf.cell(0, 10, f"Nota Técnica: {datos['nota']}", 0, 1)
+        pdf.multi_cell(0, 5, f"NOTA TECNICA: {datos['nota']}")
         pdf.set_text_color(0)
-    pdf.set_font('Arial', 'I', 9); pdf.multi_cell(0, 5, "Validez: 15 días. Incluye: Materiales, Mano de Obra, Dirección Técnica.")
+    
+    # CONDICIONES
+    pdf.ln(5); pdf.set_font('Arial', 'I', 8)
+    pdf.multi_cell(0, 4, "Validez: 15 días. Forma de pago: 50% Anticipo, 50% Avance de Obra. Incluye dirección técnica.")
+    
+    # FIRMA DEL GERENTE (NUEVO)
+    pdf.ln(25)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 5, "______________________________________", 0, 1)
+    pdf.cell(0, 5, "MANUEL ENRIQUE PRADA FORERO", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 5, "Gerente General | Ferrotek S.A.S", 0, 1)
+    pdf.cell(0, 5, "Abogado & Director Jurídico", 0, 1)
+    
     return bytes(pdf.output(dest='S'))
 
 def generar_portafolio(tipo="master"):
@@ -331,9 +336,10 @@ elif st.session_state.view == 'casas':
             data_t = calcular_proyecto({'area': area_t, 'estilo': 'Tradicional'}, "casa", full_t)
             st.metric("Inversión", f"${data_t['precio']:,.0f}")
             mostrar_desglose(data_t)
-            if st.text_input("Cliente Tradicional:", key="cli_t"):
+            cli_t = st.text_input("Nombre del Cliente:", key="cli_txt_t")
+            if cli_t:
                 desc_pdf = f"Modelo: {mod_t}. Estilo: Tradicional (PVC 2 Aguas). Área: {area_t}m2. Incluye acabados y pintura."
-                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, desc_pdf), "cot_trad.pdf")
+                st.download_button("PDF", generar_pdf_cotizacion(cli_t, "Casa Tradicional", data_t, desc_pdf), "cot_trad.pdf")
         with c2: 
             st.info("Techo PVC Colonial, Aleros.")
             try:
@@ -350,9 +356,10 @@ elif st.session_state.view == 'casas':
             data_m = calcular_proyecto({'area': area_m, 'estilo': 'Serie M'}, "casa", full_m)
             st.metric("Inversión", f"${data_m['precio']:,.0f}")
             mostrar_desglose(data_m)
-            if st.text_input("Cliente Serie M:", key="cli_m"):
+            cli_m = st.text_input("Nombre del Cliente:", key="cli_txt_m")
+            if cli_m:
                 desc_pdf = f"Modelo: {mod_m}. Estilo: Serie M (Cúbica). Área: {area_m}m2. Diseño Minimalista."
-                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, desc_pdf), "cot_mod.pdf")
+                st.download_button("PDF", generar_pdf_cotizacion(cli_m, "Casa Serie M", data_m, desc_pdf), "cot_mod.pdf")
         with c2: 
             st.success("Diseño Cúbico, Wet-Wall.")
             try:
@@ -370,9 +377,10 @@ elif st.session_state.view == 'muros':
         data = calcular_proyecto({'ml':ml, 'altura':alt, 'tipo':tipo}, "muro")
         st.metric("Inversión", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): 
+        cli_muro = st.text_input("Nombre del Cliente:", key="cli_txt_muro")
+        if cli_muro: 
             desc_pdf = f"Muro {tipo}. Dimensiones: {ml}m Largo x {alt}m Alto. Área Total: {ml*alt:.2f} m2. Sistema Ferrotek."
-            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Muro Perimetral", data, desc_pdf), "cot.pdf")
+            st.download_button("PDF", generar_pdf_cotizacion(cli_muro, "Muro Perimetral", data, desc_pdf), "cot.pdf")
     with c2: 
         st.info("Cerramientos de alta resistencia.")
         try:
@@ -392,9 +400,10 @@ elif st.session_state.view == 'domos':
         data = calcular_proyecto({'ancho':ancho, 'fondo':fondo}, "domo", full)
         st.metric("Inversión", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): 
+        cli_domo = st.text_input("Nombre del Cliente:", key="cli_txt_domo")
+        if cli_domo: 
             desc_pdf = f"Domo Geodésico/Evolutivo. Dimensiones Base: {ancho}m x {fondo}m. Altura Cumbrera: {data['geo']['h']:.2f}m."
-            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Domo Ferrotek", data, desc_pdf), "cot.pdf")
+            st.download_button("PDF", generar_pdf_cotizacion(cli_domo, "Domo Ferrotek", data, desc_pdf), "cot.pdf")
     with c2: 
         st.success(f"Altura: {data['geo']['h']:.2f}m")
         try:
@@ -411,9 +420,10 @@ elif st.session_state.view == 'agua':
         data = calcular_proyecto({'vol': vol/1000}, "agua")
         st.metric("Precio", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): 
+        cli_agua = st.text_input("Nombre del Cliente:", key="cli_txt_agua")
+        if cli_agua: 
             desc_pdf = f"Tanque de Almacenamiento. Capacidad: {vol} Litros. Sistema Monolítico Impermeable."
-            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Tanque de Agua", data, desc_pdf), "cot.pdf")
+            st.download_button("PDF", generar_pdf_cotizacion(cli_agua, "Tanque de Agua", data, desc_pdf), "cot.pdf")
 
 # --- FÁBRICA ---
 elif st.session_state.view == 'fabrica':

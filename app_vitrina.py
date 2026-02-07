@@ -32,13 +32,14 @@ def calcular_produccion_lote(tipo_mezcla, cantidad_bultos_30kg_meta):
     return insumos
 
 # ==========================================
-# 3. MOTOR DE COSTOS DETALLADO (V121)
+# 3. MOTOR DE COSTOS (V123)
 # ==========================================
 def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True):
     P = st.session_state['precios_reales']
     margen = st.session_state['margen'] / 100
     
     lista_mat = [] 
+    nota_tecnica = ""
     
     # --- DOMOS ---
     if linea_negocio == "domo":
@@ -68,11 +69,13 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         c_mat = sum([item['Costo'] for item in lista_mat]) 
         c_mo = math.ceil(ancho*fondo/2.0) * P['dia_cuadrilla']
         c_acab = (ancho*fondo * P.get('valor_acabados_vis_m2', 350000)) if incluye_acabados else 0
-        
         total = c_mat + c_mo + c_acab
+        
+        nota_tecnica = "DISEÑO: Oriente el ventanal al NORTE/SUR. Use 'Barn Doors' (Corredizas) para separar cocina."
+        
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
                 "geo": {"h": alt_c, "area": area_tot}, 
-                "desglose": {"mat":c_mat, "mo":c_mo, "acab":c_acab}, "materiales": lista_mat}
+                "desglose": {"mat":c_mat, "mo":c_mo, "acab":c_acab}, "materiales": lista_mat, "nota": nota_tecnica}
 
     # --- MUROS ---
     elif linea_negocio == "muro":
@@ -106,10 +109,12 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         
         c_mat = sum([item['Costo'] for item in lista_mat])
         c_mo = (area/5.0 * P['dia_cuadrilla']) * (1.5 if es_doble else 1.0)
-        
         total = c_mat + c_mo
+        
+        nota_tecnica = "NORMA: Curado con agua 3 veces/día por 4 días. Anclaje inferior obligatorio cada 60cm."
+        
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
-                "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat}
+                "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat, "nota": nota_tecnica}
 
     # --- CASAS ---
     elif linea_negocio == "casa":
@@ -146,10 +151,12 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         c_mat = sum([item['Costo'] for item in lista_mat]) 
         c_mo = area * P['dia_cuadrilla'] * 1.1
         c_acab = (area * P['valor_acabados_m2']) if incluye_acabados else 0
-        
         total = c_mat + c_mo + c_acab
+        
+        nota_tecnica = "DISEÑO: Dejar paso lateral de 90cm en el lote. Comedor con vista al patio (ventanal grande)."
+        
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
-                "desglose": {"mat": c_mat, "mo": c_mo, "acab": c_acab}, "materiales": lista_mat}
+                "desglose": {"mat": c_mat, "mo": c_mo, "acab": c_acab}, "materiales": lista_mat, "nota": nota_tecnica}
 
     # --- AGUA ---
     elif linea_negocio == "agua":
@@ -165,18 +172,56 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         c_mat = sum([item['Costo'] for item in lista_mat])
         c_mo = area_m/2.0 * P['dia_cuadrilla']
         total = c_mat + c_mo
+        
+        nota_tecnica = "NORMA: Vibrado manual obligatorio. Usar aditivo impermeabilizante."
+        
         return {"precio": total/(1-margen), "utilidad": (total/(1-margen))-total, 
-                "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat}
+                "desglose": {"mat":c_mat, "mo":c_mo, "acab":0}, "materiales": lista_mat, "nota": nota_tecnica}
 
     return {"precio": 0}
 
 # ==========================================
-# 4. GENERADOR PDF
+# 4. GENERADOR PDF (ACTUALIZADO CON GUÍA DE DISEÑO)
 # ==========================================
 class PDFDossier(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16); self.cell(0, 10, 'FERROTEK S.A.S', 0, 1, 'C')
         self.set_font('Arial', 'I', 10); self.cell(0, 10, 'Innovación Constructiva', 0, 1, 'C'); self.ln(5)
+
+    # NUEVO MÉTODO: GUÍA DE DISEÑO
+    def generar_guia_diseno(self):
+        self.add_page()
+        self.set_font('Arial', 'B', 20); self.set_text_color(0, 51, 102)
+        self.cell(0, 15, "FILOSOFIA DE DISEÑO FERROTEK", 0, 1, 'C')
+        self.line(10, 25, 200, 25); self.ln(10)
+        
+        self.set_text_color(0)
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, "1. EL METRO CUADRADO UTIL (No pague por ladrillos)", 0, 1)
+        self.set_font('Arial', '', 11)
+        self.multi_cell(0, 6, "En la construccion tradicional, los muros le roban hasta un 15% del area. Con el sistema Ferrotek (espesor 10-12 cm), usted gana casi 4 m2 adicionales en una casa de 60 m2. Eso es un baño entero GRATIS.")
+        self.ln(5)
+        
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, "2. FLEXIBILIDAD Y PLANTA LIBRE (Bovedas)", 0, 1)
+        self.set_font('Arial', '', 11)
+        self.multi_cell(0, 6, "Nuestras Bovedas Evolutivas no tienen columnas internas. Sugerimos usar 'Puertas Granero' (Corredizas) para separar la cocina solo cuando sea necesario, manteniendo el espacio abierto el resto del dia.")
+        self.ln(5)
+        
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, "3. ORIENTACION SOLAR INTELIGENTE", 0, 1)
+        self.set_font('Arial', '', 11)
+        self.multi_cell(0, 6, "Oriente los ventanales hacia la trayectoria solar predominante (Norte/Sur) para ganar luz sin calor. Use la cara 'ciega' de la curva para protegerse del sol poniente (Oeste).")
+        self.ln(5)
+        
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, "4. CONEXION Y CIRCULACION", 0, 1)
+        self.set_font('Arial', '', 11)
+        self.multi_cell(0, 6, "NO apoye la casa en ambas medianeras. Deje un paso lateral de 90cm. Agrupe las puertas de las habitaciones para limpiar el espacio visual (evite pasillos diagonales).")
+        self.ln(5)
+
+        self.set_font('Arial', 'I', 10); self.set_text_color(100)
+        self.cell(0, 10, "Ferrotek: Asesoria Arquitectonica Incluida.", 0, 1, 'C')
 
 def generar_pdf_cotizacion(cliente, proyecto, datos, desc):
     pdf = PDFDossier(); pdf.add_page(); pdf.set_font('Arial', '', 12)
@@ -184,11 +229,20 @@ def generar_pdf_cotizacion(cliente, proyecto, datos, desc):
     pdf.set_font('Arial', 'B', 14); pdf.cell(0, 10, f"COTIZACION: {proyecto}", 0, 1)
     pdf.set_font('Arial', '', 11); pdf.multi_cell(0, 6, desc); pdf.ln(10)
     pdf.set_font('Arial', 'B', 16); pdf.cell(0, 15, f"INVERSION TOTAL: ${datos['precio']:,.0f}", 0, 1)
+    if 'nota' in datos:
+        pdf.set_font('Arial', 'B', 9); pdf.set_text_color(100, 0, 0)
+        pdf.cell(0, 10, f"Nota Técnica: {datos['nota']}", 0, 1)
+        pdf.set_text_color(0)
     pdf.set_font('Arial', 'I', 9); pdf.multi_cell(0, 5, "Validez: 15 días. Incluye: Materiales, Mano de Obra, Dirección Técnica.")
     return bytes(pdf.output(dest='S'))
 
 def generar_portafolio(tipo="master"):
-    pdf = PDFDossier(); pdf.add_page()
+    pdf = PDFDossier()
+    if tipo == "guia": # Lógica para la Guía de Diseño
+        pdf.generar_guia_diseno()
+        return bytes(pdf.output(dest='S'))
+        
+    pdf.add_page()
     pdf.set_font('Arial', 'B', 24); pdf.set_text_color(0, 51, 102); pdf.cell(0, 20, "PORTAFOLIO FERROTEK", 0, 1, 'C')
     pdf.set_font('Arial', '', 11); pdf.set_text_color(0)
     if tipo in ["master", "casas"]:
@@ -222,6 +276,9 @@ def set_view(name): st.session_state.view = name
 # 6. VISTAS
 # ==========================================
 def mostrar_desglose(data):
+    if 'nota' in data:
+        st.info(f"ℹ️ {data['nota']}") 
+    
     if es_admin:
         st.markdown("---")
         st.markdown("##### 🕵️ Auditoría Financiera")
@@ -236,9 +293,13 @@ def mostrar_desglose(data):
 # --- HOME ---
 if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Soluciones Industrializadas")
-    c1, c2 = st.columns(2)
+    
+    # SECCIÓN DE DOCUMENTOS (Ahora con 3 columnas)
+    st.markdown("### 📂 Centro de Documentación")
+    c1, c2, c3 = st.columns(3)
     with c1: st.download_button("📘 Portafolio Master", generar_portafolio("master"), "Master.pdf", "application/pdf", use_container_width=True)
     with c2: st.download_button("🏠 Brochure Casas", generar_portafolio("casas"), "Casas.pdf", "application/pdf", use_container_width=True)
+    with c3: st.download_button("🎁 Guía de Diseño", generar_portafolio("guia"), "Guia_Diseno.pdf", "application/pdf", use_container_width=True) # NUEVO BOTÓN
     
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
@@ -273,7 +334,6 @@ elif st.session_state.view == 'casas':
             st.metric("Inversión", f"${data_t['precio']:,.0f}")
             mostrar_desglose(data_t)
             if st.text_input("Cliente Tradicional:", key="cli_t"):
-                # CORRECCIÓN: Descripción detallada en PDF
                 desc_pdf = f"Modelo: {mod_t}. Estilo: Tradicional (PVC 2 Aguas). Área: {area_t}m2. Incluye acabados y pintura."
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, desc_pdf), "cot_trad.pdf")
         with c2: 
@@ -307,7 +367,6 @@ elif st.session_state.view == 'muros':
         st.metric("Inversión", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
         if st.text_input("Cliente:"): 
-            # CORRECCIÓN: Descripción detallada en PDF con medidas
             desc_pdf = f"Muro {tipo}. Dimensiones: {ml}m Largo x {alt}m Alto. Área Total: {ml*alt:.2f} m2. Sistema Ferrotek."
             st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Muro Perimetral", data, desc_pdf), "cot.pdf")
     with c2: 

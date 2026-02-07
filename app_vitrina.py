@@ -181,14 +181,13 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
     return {"precio": 0}
 
 # ==========================================
-# 4. GENERADOR PDF (ACTUALIZADO CON GUÍA DE DISEÑO)
+# 4. GENERADOR PDF (CON GUÍA)
 # ==========================================
 class PDFDossier(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16); self.cell(0, 10, 'FERROTEK S.A.S', 0, 1, 'C')
         self.set_font('Arial', 'I', 10); self.cell(0, 10, 'Innovación Constructiva', 0, 1, 'C'); self.ln(5)
 
-    # NUEVO MÉTODO: GUÍA DE DISEÑO
     def generar_guia_diseno(self):
         self.add_page()
         self.set_font('Arial', 'B', 20); self.set_text_color(0, 51, 102)
@@ -197,27 +196,27 @@ class PDFDossier(FPDF):
         
         self.set_text_color(0)
         self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "1. EL METRO CUADRADO UTIL (No pague por ladrillos)", 0, 1)
+        self.cell(0, 10, "1. EL METRO CUADRADO UTIL", 0, 1)
         self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "En la construccion tradicional, los muros le roban hasta un 15% del area. Con el sistema Ferrotek (espesor 10-12 cm), usted gana casi 4 m2 adicionales en una casa de 60 m2. Eso es un baño entero GRATIS.")
+        self.multi_cell(0, 6, "En la construccion tradicional, los muros le roban hasta un 15% del area. Con el sistema Ferrotek (espesor 10-12 cm), usted gana casi 4 m2 adicionales en una casa de 60 m2.")
         self.ln(5)
         
         self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, "2. FLEXIBILIDAD Y PLANTA LIBRE (Bovedas)", 0, 1)
+        self.cell(0, 10, "2. FLEXIBILIDAD Y PLANTA LIBRE", 0, 1)
         self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "Nuestras Bovedas Evolutivas no tienen columnas internas. Sugerimos usar 'Puertas Granero' (Corredizas) para separar la cocina solo cuando sea necesario, manteniendo el espacio abierto el resto del dia.")
+        self.multi_cell(0, 6, "Nuestras Bovedas Evolutivas no tienen columnas internas. Sugerimos usar 'Puertas Granero' (Corredizas) para separar la cocina solo cuando sea necesario.")
         self.ln(5)
         
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, "3. ORIENTACION SOLAR INTELIGENTE", 0, 1)
         self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "Oriente los ventanales hacia la trayectoria solar predominante (Norte/Sur) para ganar luz sin calor. Use la cara 'ciega' de la curva para protegerse del sol poniente (Oeste).")
+        self.multi_cell(0, 6, "Oriente los ventanales hacia la trayectoria solar predominante (Norte/Sur). Use la cara 'ciega' de la curva para protegerse del sol poniente.")
         self.ln(5)
         
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, "4. CONEXION Y CIRCULACION", 0, 1)
         self.set_font('Arial', '', 11)
-        self.multi_cell(0, 6, "NO apoye la casa en ambas medianeras. Deje un paso lateral de 90cm. Agrupe las puertas de las habitaciones para limpiar el espacio visual (evite pasillos diagonales).")
+        self.multi_cell(0, 6, "NO apoye la casa en ambas medianeras. Deje un paso lateral de 90cm. Agrupe las puertas de las habitaciones.")
         self.ln(5)
 
         self.set_font('Arial', 'I', 10); self.set_text_color(100)
@@ -238,7 +237,7 @@ def generar_pdf_cotizacion(cliente, proyecto, datos, desc):
 
 def generar_portafolio(tipo="master"):
     pdf = PDFDossier()
-    if tipo == "guia": # Lógica para la Guía de Diseño
+    if tipo == "guia": 
         pdf.generar_guia_diseno()
         return bytes(pdf.output(dest='S'))
         
@@ -294,12 +293,11 @@ def mostrar_desglose(data):
 if st.session_state.view == 'home':
     st.title("🏗️ FERROTEK: Soluciones Industrializadas")
     
-    # SECCIÓN DE DOCUMENTOS (Ahora con 3 columnas)
     st.markdown("### 📂 Centro de Documentación")
     c1, c2, c3 = st.columns(3)
     with c1: st.download_button("📘 Portafolio Master", generar_portafolio("master"), "Master.pdf", "application/pdf", use_container_width=True)
     with c2: st.download_button("🏠 Brochure Casas", generar_portafolio("casas"), "Casas.pdf", "application/pdf", use_container_width=True)
-    with c3: st.download_button("🎁 Guía de Diseño", generar_portafolio("guia"), "Guia_Diseno.pdf", "application/pdf", use_container_width=True) # NUEVO BOTÓN
+    with c3: st.download_button("🎁 Guía de Diseño", generar_portafolio("guia"), "Guia_Diseno.pdf", "application/pdf", use_container_width=True)
     
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
@@ -338,7 +336,10 @@ elif st.session_state.view == 'casas':
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, desc_pdf), "cot_trad.pdf")
         with c2: 
             st.info("Techo PVC Colonial, Aleros.")
-            try: st.image("vis_familiar.png", width=400); except: pass
+            try:
+                st.image("vis_familiar.png", width=400)
+            except:
+                pass
 
     with tab_mod:
         c1, c2 = st.columns(2)
@@ -354,7 +355,10 @@ elif st.session_state.view == 'casas':
                 st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, desc_pdf), "cot_mod.pdf")
         with c2: 
             st.success("Diseño Cúbico, Wet-Wall.")
-            try: st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400); except: pass
+            try:
+                st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400)
+            except:
+                pass
 
 # --- MUROS ---
 elif st.session_state.view == 'muros':
@@ -371,7 +375,10 @@ elif st.session_state.view == 'muros':
             st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Muro Perimetral", data, desc_pdf), "cot.pdf")
     with c2: 
         st.info("Cerramientos de alta resistencia.")
-        try: st.image("muro_perimetral.png", use_container_width=True); except: pass
+        try:
+            st.image("muro_perimetral.png", use_container_width=True)
+        except:
+            pass
 
 # --- DOMOS ---
 elif st.session_state.view == 'domos':
@@ -390,7 +397,10 @@ elif st.session_state.view == 'domos':
             st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Domo Ferrotek", data, desc_pdf), "cot.pdf")
     with c2: 
         st.success(f"Altura: {data['geo']['h']:.2f}m")
-        try: st.image("Loft_rural.png", use_container_width=True); except: pass
+        try:
+            st.image("Loft_rural.png", use_container_width=True)
+        except:
+            pass
 
 # --- AGUA ---
 elif st.session_state.view == 'agua':

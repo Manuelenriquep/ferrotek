@@ -79,9 +79,8 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         ml = input_data['ml']; alt = input_data['altura']; area = ml*alt
         tipo = input_data['tipo']; es_doble = "Doble" in tipo
         
-        # Factores Técnicos
-        f_perf = 1.8 if es_doble else 1.5 # 1.5 para Sencillo (Postes cada 1.2m)
-        f_malla = 2.1 if es_doble else 1.1 # 1.1 para Sencillo (Malla central)
+        f_perf = 1.8 if es_doble else 1.5 
+        f_malla = 2.1 if es_doble else 1.1 
         f_cem = 0.4 if es_doble else 0.25 
         
         ml_perf = area * f_perf
@@ -89,11 +88,9 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         cant_malla = math.ceil(area * f_malla)
         cant_cemento = math.ceil(area * f_cem)
         
-        # Fijaciones (CORREGIDO)
-        cant_tornillos = math.ceil(area * 30) # 30 tornillos por m2 (Estructura + Malla)
-        cant_anclajes = math.ceil(ml / 0.60) # 1 perno cada 60cm en la base
+        cant_tornillos = math.ceil(area * 30)
+        cant_anclajes = math.ceil(ml / 0.60) 
         
-        # Cimentación
         vol_cinta = ml * 0.20 * 0.25
         cant_cem_cim = math.ceil(vol_cinta * 7)
         cant_arena_cim = vol_cinta * 1.1
@@ -133,14 +130,13 @@ def calcular_proyecto(input_data, linea_negocio="general", incluye_acabados=True
         cant_cemento = math.ceil(area_muros * 0.35 + (area*0.1*7))
         cant_tejas = math.ceil(area_techo / 1.8)
         
-        # Fijaciones Casa
         cant_tornillos = math.ceil((area_muros + area_techo) * 35)
-        cant_kit_teja = math.ceil(area_techo * 4) # 4 tornillos techo por m2
+        cant_kit_teja = math.ceil(area_techo * 4) 
         
         lista_mat = [
             {"Insumo": "Perfil PGC 90x40 Cal.22 (Total)", "Cant": cant_tubos_muro+cant_tubos_techo, "Unid": "Tubos", "Costo": (cant_tubos_muro+cant_tubos_techo)*6*P['perfil_pgc90_ml']},
             {"Insumo": f"Cubierta: {nom_teja}", "Cant": cant_tejas, "Unid": "Hojas", "Costo": cant_tejas*1.8*p_teja},
-            {"Insumo": "Kit Fijación Teja (Tornillo+Capuchón)", "Cant": cant_kit_teja, "Unid": "Und", "Costo": cant_kit_teja * 800},
+            {"Insumo": "Kit Fijación Teja", "Cant": cant_kit_teja, "Unid": "Und", "Costo": cant_kit_teja * 800},
             {"Insumo": "Tornillería Estructura (Wafer)", "Cant": cant_tornillos, "Unid": "Und", "Costo": cant_tornillos * 150},
             {"Insumo": "Malla Electrosoldada 5mm", "Cant": cant_malla, "Unid": "m2", "Costo": cant_malla*P['malla_5mm_m2']},
             {"Insumo": "Cemento Estructural (Gris)", "Cant": cant_cemento, "Unid": "Bultos", "Costo": cant_cemento*P['cemento_gris_50kg']},
@@ -277,13 +273,12 @@ elif st.session_state.view == 'casas':
             st.metric("Inversión", f"${data_t['precio']:,.0f}")
             mostrar_desglose(data_t)
             if st.text_input("Cliente Tradicional:", key="cli_t"):
-                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, mod_t), "cot_trad.pdf")
+                # CORRECCIÓN: Descripción detallada en PDF
+                desc_pdf = f"Modelo: {mod_t}. Estilo: Tradicional (PVC 2 Aguas). Área: {area_t}m2. Incluye acabados y pintura."
+                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_t'), "Casa Tradicional", data_t, desc_pdf), "cot_trad.pdf")
         with c2: 
             st.info("Techo PVC Colonial, Aleros.")
-            try:
-                st.image("vis_familiar.png", width=400)
-            except:
-                pass
+            try: st.image("vis_familiar.png", width=400); except: pass
 
     with tab_mod:
         c1, c2 = st.columns(2)
@@ -295,13 +290,11 @@ elif st.session_state.view == 'casas':
             st.metric("Inversión", f"${data_m['precio']:,.0f}")
             mostrar_desglose(data_m)
             if st.text_input("Cliente Serie M:", key="cli_m"):
-                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, mod_m), "cot_mod.pdf")
+                desc_pdf = f"Modelo: {mod_m}. Estilo: Serie M (Cúbica). Área: {area_m}m2. Diseño Minimalista."
+                st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('cli_m'), "Casa Serie M", data_m, desc_pdf), "cot_mod.pdf")
         with c2: 
             st.success("Diseño Cúbico, Wet-Wall.")
-            try:
-                st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400)
-            except:
-                pass
+            try: st.image("vivienda_suite.png" if "M-2" in mod_m else "vivienda_master.png", width=400); except: pass
 
 # --- MUROS ---
 elif st.session_state.view == 'muros':
@@ -313,13 +306,13 @@ elif st.session_state.view == 'muros':
         data = calcular_proyecto({'ml':ml, 'altura':alt, 'tipo':tipo}, "muro")
         st.metric("Inversión", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Muro", data, f"{tipo}"), "cot.pdf")
+        if st.text_input("Cliente:"): 
+            # CORRECCIÓN: Descripción detallada en PDF con medidas
+            desc_pdf = f"Muro {tipo}. Dimensiones: {ml}m Largo x {alt}m Alto. Área Total: {ml*alt:.2f} m2. Sistema Ferrotek."
+            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Muro Perimetral", data, desc_pdf), "cot.pdf")
     with c2: 
         st.info("Cerramientos de alta resistencia.")
-        try:
-            st.image("muro_perimetral.png", use_container_width=True)
-        except:
-            pass
+        try: st.image("muro_perimetral.png", use_container_width=True); except: pass
 
 # --- DOMOS ---
 elif st.session_state.view == 'domos':
@@ -333,13 +326,12 @@ elif st.session_state.view == 'domos':
         data = calcular_proyecto({'ancho':ancho, 'fondo':fondo}, "domo", full)
         st.metric("Inversión", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Domo", data, f"{ancho}x{fondo}m"), "cot.pdf")
+        if st.text_input("Cliente:"): 
+            desc_pdf = f"Domo Geodésico/Evolutivo. Dimensiones Base: {ancho}m x {fondo}m. Altura Cumbrera: {data['geo']['h']:.2f}m."
+            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Domo Ferrotek", data, desc_pdf), "cot.pdf")
     with c2: 
         st.success(f"Altura: {data['geo']['h']:.2f}m")
-        try:
-            st.image("Loft_rural.png", use_container_width=True)
-        except:
-            pass
+        try: st.image("Loft_rural.png", use_container_width=True); except: pass
 
 # --- AGUA ---
 elif st.session_state.view == 'agua':
@@ -350,7 +342,9 @@ elif st.session_state.view == 'agua':
         data = calcular_proyecto({'vol': vol/1000}, "agua")
         st.metric("Precio", f"${data['precio']:,.0f}")
         mostrar_desglose(data)
-        if st.text_input("Cliente:"): st.download_button("PDF", generar_pdf_cotizacion("Cli", "Tanque", data, f"{vol}L"), "cot.pdf")
+        if st.text_input("Cliente:"): 
+            desc_pdf = f"Tanque de Almacenamiento. Capacidad: {vol} Litros. Sistema Monolítico Impermeable."
+            st.download_button("PDF", generar_pdf_cotizacion(st.session_state.get('Cliente', 'Cli'), "Tanque de Agua", data, desc_pdf), "cot.pdf")
 
 # --- FÁBRICA ---
 elif st.session_state.view == 'fabrica':
